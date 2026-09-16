@@ -95,6 +95,7 @@ export function ModelSelectionCard({ scene, className }: ModelSelectionCardProps
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search models or traits"
+            aria-label="Search models or traits"
             className="h-9 w-full rounded-full border border-white/10 bg-black/20 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50 sm:w-96"
           />
         </div>
@@ -166,13 +167,13 @@ export function ModelSelectionCard({ scene, className }: ModelSelectionCardProps
         <span className="flex items-center gap-2 text-xs text-muted-foreground">
           Showing {filtered.length} models
           <span className="rounded-full border border-white/10 px-2 py-0.5 font-medium text-foreground">
-            Model passes: 1
+            {selected?.usage ?? "1 pass"}
           </span>
         </span>
       </div>
 
       {/* Model grid — 4 columns, scrollable like the reference */}
-      <div className="grid max-h-[282px] grid-cols-2 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-3 xl:grid-cols-4">
+      <div className="grid max-h-[420px] grid-cols-2 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-3 xl:grid-cols-4">
         {filtered.map((m) => (
           <ModelRow
             key={m.id}

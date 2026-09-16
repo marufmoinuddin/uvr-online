@@ -40,3 +40,22 @@ export async function POST(
     );
   }
 }
+
+/** DELETE /api/jobs/:id — remove a single finished job from the console. */
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    const res = await fetch(`${API_URL}/api/jobs/${params.id}`, {
+      method: "DELETE",
+    });
+    const data = await res.json().catch(() => ({}));
+    return NextResponse.json(data, { status: res.status });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to delete job" },
+      { status: 502 },
+    );
+  }
+}

@@ -15,12 +15,15 @@ interface Store {
   scene: SceneKey;
   theme: "light" | "dark" | "system";
   favorites: string[];
+  /** Whether the local GPU worker is reachable (null = not checked yet). */
+  backendOnline: boolean | null;
 
   setModelCatalog: (models: Model[]) => void;
   selectModel: (id: string) => void;
   setScene: (scene: SceneKey) => void;
   setTheme: (theme: "light" | "dark" | "system") => void;
   toggleFavorite: (id: string) => void;
+  setBackendOnline: (online: boolean) => void;
   addJob: (job: Job) => void;
   upsertJob: (job: Job) => void;
   syncJobs: (jobs: Job[]) => void;
@@ -39,11 +42,13 @@ export const useStore = create<Store>()(
       scene: "vocal-remover",
       theme: "system",
       favorites: [],
+      backendOnline: null,
 
       setModelCatalog: (modelCatalog) => set({ modelCatalog }),
       selectModel: (selectedModelId) => set({ selectedModelId }),
       setScene: (scene) => set({ scene }),
       setTheme: (theme) => set({ theme }),
+      setBackendOnline: (backendOnline) => set({ backendOnline }),
       toggleFavorite: (id) =>
         set({
           favorites: get().favorites.includes(id)

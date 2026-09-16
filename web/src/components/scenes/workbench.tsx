@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SCENES, getScene } from "@/lib/models";
+import { SCENES, getScene, modelsForScene } from "@/lib/models";
 import { useStore } from "@/lib/store";
 import type { SceneKey } from "@/lib/types";
 
@@ -35,12 +35,29 @@ export function Workbench({
 }) {
   const meta = getScene(scene);
   const selectModel = useStore((s) => s.selectModel);
+  const selectedModelId = useStore((s) => s.selectedModelId);
+  const catalog = useStore((s) => s.modelCatalog);
   const router = useRouter();
 
   // Preselect a model when arriving via ?model= (e.g. "Try" from Explore).
   React.useEffect(() => {
     if (initialModelId) selectModel(initialModelId);
   }, [initialModelId, selectModel]);
+
+  // Ensure the selected model is valid for the current scene; otherwise fall
+  // back to the scene's default model (fixes "Selected: —").
+  const sceneModels = React.useMemo(
+    () => modelsForScene(scene, catalog),
+    [scene, catalog],
+  );
+  React.useEffect(() => {
+    if (
+      sceneModels.length > 0 &&
+      !sceneModels.some((m) => m.id === selectedModelId)
+    ) {
+      selectModel(meta.defaultModelId);
+    }
+  }, [sceneModels, selectedModelId, selectModel, meta.defaultModelId]);
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] items-start gap-6 px-4 py-6 sm:px-8">

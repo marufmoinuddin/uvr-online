@@ -16,6 +16,16 @@ import { modelsForScene } from "@/lib/models";
 import { createJob } from "@/lib/api";
 import { listManagedModels, type ManagedModel } from "@/lib/models-api";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -80,6 +90,7 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
   const [uploadPct, setUploadPct] = React.useState(0);
   const [rejectionMessage, setRejectionMessage] = React.useState("");
   const [jobError, setJobError] = React.useState("");
+  const [confirmBatch, setConfirmBatch] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   const addFiles = React.useCallback((list: FileList | File[] | null) => {
@@ -358,7 +369,10 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
           <div className="grid grid-cols-[minmax(0,1fr)_112px] gap-2">
             <button
               type="button"
-              onClick={handleProcess}
+              onClick={() => {
+                if (files.length > 1) setConfirmBatch(true);
+                else handleProcess();
+              }}
               disabled={files.length === 0 || submitting || isEnsemble}
               title={
                 isEnsemble
@@ -395,6 +409,14 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
               </span>
             </div>
           </div>
+          {submitting && uploadPct > 0 && uploadPct < 100 && (
+            <div className="space-y-1">
+              <Progress value={uploadPct} />
+              <p className="text-center text-[11px] text-muted-foreground">
+                Uploading… {uploadPct}%
+              </p>
+            </div>
+          )}
           {isEnsemble && (
             <p className="text-xs text-amber-400">
               Ensemble preset selected — run 2+ separations, then fuse them with
@@ -403,6 +425,40 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
           )}
         </div>
       </div>
+
+      {/* Batch submit confirm — only when more than one file is queued */}
+      <Dialog open={confirmBatch} onOpenChange={(open) => !open && setConfirmBatch(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Process {files.length} files?</DialogTitle>
+            <DialogDescription>
+              Each file will be separated with the selected model. This queues{" "}
+              {files.length} jobs on the GPU worker.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-white/10 bg-white/[0.03] p-2 text-xs text-muted-foreground">
+            {files.map((f) => (
+              <div key={f.name} className="flex items-center justify-between gap-2">
+                <span className="truncate">{f.name}</span>
+                <span className="shrink-0">{formatBytes(f.size)}</span>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmBatch(false)}>
+              Keep editing
+            </Button>
+            <Button
+              onClick={() => {
+                setConfirmBatch(false);
+                handleProcess();
+              }}
+            >
+              Process all
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

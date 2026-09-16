@@ -383,8 +383,8 @@ export const SCENES: SceneMeta[] = [
   },
   {
     key: "model-picker",
-    label: "UVR5 Online",
-    short: "UVR5 Online",
+    label: "Full Model Picker",
+    short: "Model Picker",
     description: "Full model picker — all 80+ architectures.",
     icon: "grid-2x2",
     defaultModelId: "mel_band_roformer_deux",

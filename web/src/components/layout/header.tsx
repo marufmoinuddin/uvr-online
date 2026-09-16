@@ -116,7 +116,14 @@ export function Header() {
                 <TooltipTrigger asChild>
                   <Button variant="outline" size="sm" className="cursor-default">
                     <span className="flex items-center gap-1.5 text-xs">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 rounded-full",
+                          useStore((s) => s.backendOnline) !== false
+                            ? "bg-emerald-500"
+                            : "bg-red-500",
+                        )}
+                      />
                       Unlimited · local
                     </span>
                   </Button>

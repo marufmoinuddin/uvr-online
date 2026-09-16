@@ -27,6 +27,15 @@ import {
   type StorageInfo,
 } from "@/lib/models-api";
 import { licenseFor } from "@/lib/licenses";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 /**
  * Model Management panel — shows every catalog model with its local cache
@@ -44,6 +53,7 @@ export function ModelManager({ className }: { className?: string }) {
   const [filter, setFilter] = React.useState<"all" | "installed" | "available">(
     "all",
   );
+  const [deleteTarget, setDeleteTarget] = React.useState<ManagedModel | null>(null);
 
   const refresh = React.useCallback(async () => {
     try {
@@ -162,10 +172,40 @@ export function ModelManager({ className }: { className?: string }) {
             error={errors[m.id]}
             onDownload={() => act(m.id, () => startModelDownload(m.id))}
             onCancel={() => act(m.id, () => cancelModelDownload(m.id))}
-            onDelete={() => act(m.id, () => deleteModel(m.id))}
+            onDelete={() => setDeleteTarget(m)}
           />
         ))}
       </div>
+
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete model?</DialogTitle>
+            <DialogDescription>
+              {deleteTarget && (
+                <>
+                  Delete &quot;{deleteTarget.name}&quot;? This removes the cached files from disk.
+                  The model will be re-downloaded the next time it is used.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deleteTarget) act(deleteTarget.id, () => deleteModel(deleteTarget.id));
+                setDeleteTarget(null);
+              }}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
@@ -274,9 +314,7 @@ function ModelRowView({
           ) : model.installed ? (
             <button
               type="button"
-              onClick={() => {
-                if (window.confirm(`Delete ${model.name}? This cannot be undone.`)) onDelete();
-              }}
+              onClick={onDelete}
               disabled={busy}
               className="flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-red-500/50"
             >

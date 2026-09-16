@@ -190,12 +190,28 @@ async def list_jobs() -> list[dict]:
     return queue.list()
 
 
+@api.delete("/jobs")
+async def clear_jobs() -> dict:
+    """Clear finished jobs (ready / error / cancelled) from the console.
+    Queued and processing jobs are kept so in-flight work is not lost."""
+    removed = queue.clear()
+    return {"cleared": removed}
+
+
 @api.get("/jobs/{job_id}")
 async def get_job(job_id: str) -> dict:
     job = queue.get(job_id)
     if job is None:
         raise HTTPException(404, "Job not found")
     return job.to_dict()
+
+
+@api.delete("/jobs/{job_id}")
+async def delete_job(job_id: str) -> dict:
+    """Remove a single finished job from the console."""
+    if not queue.remove(job_id):
+        raise HTTPException(404, "Job not found or still active")
+    return {"id": job_id, "deleted": True}
 
 
 @api.post("/jobs/{job_id}/reuse")
@@ -215,6 +231,16 @@ async def reuse_job(job_id: str, payload: dict) -> dict:
         job.input_path,
     )
     return {"jobId": new_job.id, "status": new_job.status, "etaSec": new_job.eta_sec or 30}
+
+
+@api.post("/jobs/{job_id}/cancel")
+async def cancel_job(job_id: str) -> dict:
+    """Cancel a queued or running job. Queued jobs stop immediately; a running
+    job is flagged and its result is discarded when the worker finishes."""
+    job = await queue.cancel(job_id)
+    if job is None:
+        raise HTTPException(404, "Job not found")
+    return {"id": job_id, "cancelled": True, "status": job.status}
 
 
 @api.get("/jobs/{job_id}/stems/{stem_name}")

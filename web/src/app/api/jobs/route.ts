@@ -40,3 +40,17 @@ export async function GET() {
     );
   }
 }
+
+/** DELETE /api/jobs — clear finished jobs from the worker's console. */
+export async function DELETE() {
+  try {
+    const res = await fetch(`${API_URL}/api/jobs`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    return NextResponse.json(data, { status: res.status });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to clear jobs" },
+      { status: 502 },
+    );
+  }
+}

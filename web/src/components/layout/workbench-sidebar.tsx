@@ -13,6 +13,7 @@ import {
   AudioLines,
   ChevronsUpDown,
   AudioWaveform,
+  Grid2X2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -54,13 +55,14 @@ const GROUPS: NavGroup[] = [
   {
     label: "Repair",
     items: [
-      { key: "denoise", label: "Audio Repair", href: "/tools/denoise", icon: Wrench },
+      { key: "denoise", label: "Noise Removal", href: "/tools/denoise", icon: Wrench },
     ],
   },
   {
     label: "Production",
     items: [
       { key: "production", label: "Music Production Tools", href: "/tools/production", icon: AudioLines },
+      { key: "model-picker", label: "Model Picker", href: "/tools/model-picker", icon: Grid2X2 },
     ],
   },
 ];

@@ -13,6 +13,48 @@ const WS_URL =
     ? `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`
     : "");
 
+/**
+ * Turn an HTTP failure into a human-readable message. Prefers a message the
+ * backend actually sent (FastAPI `detail` or our proxy `error`), falling back
+ * to a plain-language explanation of the status code.
+ */
+export function friendlyApiError(status: number, body?: string): string {
+  if (body) {
+    try {
+      const parsed = JSON.parse(body) as { error?: unknown; detail?: unknown };
+      const msg =
+        typeof parsed.error === "string"
+          ? parsed.error
+          : typeof parsed.detail === "string"
+            ? parsed.detail
+            : null;
+      if (msg) return msg;
+    } catch {
+      /* not JSON — fall through to the status mapping */
+    }
+  }
+  switch (status) {
+    case 0:
+      return "Network error — the processing service is unreachable.";
+    case 400:
+      return "The request was rejected. Check the file and settings, then try again.";
+    case 404:
+      return "That item no longer exists. Refresh and try again.";
+    case 410:
+      return "The original file is no longer available on disk.";
+    case 413:
+      return "That file is too large to process.";
+    case 500:
+      return "The processing service hit an internal error. Please try again.";
+    case 502:
+      return "The processing service is unreachable. Make sure the API container is running.";
+    case 503:
+      return "The processing service is busy. Try again in a moment.";
+    default:
+      return `Something went wrong (${status}). Please try again.`;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -20,7 +62,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`API ${res.status}: ${body || res.statusText}`);
+    throw new Error(friendlyApiError(res.status, body));
   }
   return res.json() as Promise<T>;
 }
@@ -50,11 +92,27 @@ export async function createJob(
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve(JSON.parse(xhr.responseText) as CreateJobResponse);
       } else {
-        reject(new Error(`Upload failed: ${xhr.status}`));
+        reject(new Error(friendlyApiError(xhr.status, xhr.responseText)));
       }
     };
-    xhr.onerror = () => reject(new Error("Network error during upload"));
+    xhr.onerror = () => reject(new Error(friendlyApiError(0)));
     xhr.send(form);
+  });
+}
+
+export async function cancelJob(id: string): Promise<{ id: string; cancelled: boolean }> {
+  return request<{ id: string; cancelled: boolean }>(`/api/jobs/${id}/cancel`, {
+    method: "POST",
+  });
+}
+
+export async function clearJobs(): Promise<{ cleared: number }> {
+  return request<{ cleared: number }>("/api/jobs", { method: "DELETE" });
+}
+
+export async function deleteJob(id: string): Promise<{ id: string; deleted: boolean }> {
+  return request<{ id: string; deleted: boolean }>(`/api/jobs/${id}`, {
+    method: "DELETE",
   });
 }
 
@@ -98,16 +156,25 @@ export function subscribeJobs(
 ): () => void {
   let ws: WebSocket | null = null;
   let closed = false;
+  let pollTimer: ReturnType<typeof setTimeout> | null = null;
+  let delay = 2000;
 
-  const pollTimer = setInterval(async () => {
-    try {
-      const jobs = await request<Job[]>("/api/jobs");
-      if (onSync) onSync(jobs);
-      else jobs.forEach(onJob);
-    } catch {
-      /* ignore */
-    }
-  }, 2000);
+  const schedulePoll = () => {
+    if (closed) return;
+    pollTimer = setTimeout(async () => {
+      try {
+        const jobs = await request<Job[]>("/api/jobs");
+        delay = 2000; // healthy — resume normal cadence
+        if (onSync) onSync(jobs);
+        else jobs.forEach(onJob);
+      } catch {
+        // Worker unreachable — back off so we don't hammer it.
+        delay = Math.min(delay * 2, 30_000);
+      }
+      schedulePoll();
+    }, delay);
+  };
+  schedulePoll();
 
   try {
     ws = new WebSocket(`${WS_URL}/ws/jobs`);
@@ -133,7 +200,7 @@ export function subscribeJobs(
 
   return () => {
     closed = true;
-    clearInterval(pollTimer);
+    if (pollTimer) clearTimeout(pollTimer);
     try {
       ws?.close();
     } catch {

@@ -1,4 +1,5 @@
 import type { Model } from "./types";
+import { friendlyApiError } from "./api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -72,7 +73,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, init);
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(body || `Request failed (${res.status})`);
+    throw new Error(friendlyApiError(res.status, body));
   }
   return res.json() as Promise<T>;
 }

@@ -34,7 +34,7 @@ class Job:
     scene: str
     model_id: str
     file_name: str
-    status: str = "queued"  # queued | processing | ready | error
+    status: str = "queued"  # queued | processing | ready | error | cancelled
     stage: str = "queued"  # queued | uploading | gpu | assemble | done
     progress: float = 0.0
     eta_sec: Optional[float] = None
@@ -45,6 +45,7 @@ class Job:
     input_path: Optional[str] = None
     output_dir: Optional[str] = None
     options: dict[str, Any] = field(default_factory=dict)
+    cancelled: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -60,6 +61,7 @@ class Job:
             "resultStems": self.result_stems,
             "downloadUrls": self.download_urls,
             "error": self.error,
+            "cancelled": self.cancelled,
         }
 
 
@@ -118,8 +120,49 @@ class JobQueue:
     def get(self, job_id: str) -> Optional[Job]:
         return self._jobs.get(job_id)
 
+    async def cancel(self, job_id: str) -> Optional[Job]:
+        """Request cancellation. Queued jobs stop immediately; a running job
+        is flagged and its result is discarded when the worker finishes."""
+        async with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None:
+                return None
+            job.cancelled = True
+            if job.status == "queued":
+                job.status = "cancelled"
+                job.stage = "done"
+                job.progress = 0.0
+                job.eta_sec = None
+        await self._broadcast(job)
+        return job
+
     def list(self) -> list[dict[str, Any]]:
         return [self._jobs[i].to_dict() for i in reversed(self._order)]
+
+    def clear(self) -> int:
+        """Drop all finished jobs (ready / error / cancelled) from the queue.
+        Queued and processing jobs are kept so in-flight work is not lost.
+        Returns the number of jobs removed."""
+        removed = 0
+        for jid in list(self._order):
+            job = self._jobs[jid]
+            if job.status in ("ready", "error", "cancelled"):
+                del self._jobs[jid]
+                self._order.remove(jid)
+                removed += 1
+        return removed
+
+    def remove(self, job_id: str) -> bool:
+        """Remove a single finished job (ready / error / cancelled) from the
+        queue. Returns True if it was removed, False if it was not found or is
+        still active."""
+        job = self._jobs.get(job_id)
+        if job is None or job.status not in ("ready", "error", "cancelled"):
+            return False
+        del self._jobs[job_id]
+        if job_id in self._order:
+            self._order.remove(job_id)
+        return True
 
     def queue_depth(self) -> int:
         return sum(1 for j in self._jobs.values() if j.status == "queued")
@@ -147,11 +190,13 @@ class JobQueue:
         async with self._lock:
             for jid in self._order:
                 job = self._jobs[jid]
-                if job.status == "queued":
+                if job.status == "queued" and not job.cancelled:
                     return job
         return None
 
     async def _process(self, job: Job) -> None:
+        if job.cancelled:
+            return
         job.status = "processing"
         job.stage = "gpu"
         job.eta_sec = 30.0
@@ -167,6 +212,13 @@ class JobQueue:
                 job.options.get("extractInstrumental", False),
                 lambda p, s: self._on_progress(job, p, s),
             )
+            if job.cancelled:
+                job.status = "cancelled"
+                job.stage = "done"
+                job.progress = 0.0
+                job.eta_sec = None
+                await self._broadcast(job)
+                return
             job.result_stems = stems
             job.download_urls = [s["url"] for s in stems]
             job.stage = "done"
@@ -175,6 +227,13 @@ class JobQueue:
             job.eta_sec = None
             await self._broadcast(job)
         except Exception as exc:  # noqa: BLE001
+            if job.cancelled:
+                job.status = "cancelled"
+                job.stage = "done"
+                job.progress = 0.0
+                job.eta_sec = None
+                await self._broadcast(job)
+                return
             logger.exception("Job %s failed", job.id)
             job.status = "error"
             job.stage = "done"

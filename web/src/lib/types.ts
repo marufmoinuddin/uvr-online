@@ -40,7 +40,7 @@ export interface Model {
   ensemble?: boolean;
 }
 
-export type JobStatus = "queued" | "processing" | "ready" | "error";
+export type JobStatus = "queued" | "processing" | "ready" | "error" | "cancelled";
 
 export type JobStage = "queued" | "uploading" | "gpu" | "assemble" | "done";
 
@@ -64,6 +64,7 @@ export interface Job {
   resultStems?: JobStem[];
   downloadUrls?: string[];
   error?: string;
+  cancelled?: boolean;
 }
 
 export interface SceneMeta {

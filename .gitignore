@@ -1,0 +1,19 @@
+# deps
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+models/*
+
+# next
+web/.next/
+web/out/
+web/.env*.local
+
+# output
+output/
+api/output/
+
+# misc
+.DS_Store
+*.log

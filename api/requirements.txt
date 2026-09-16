@@ -1,0 +1,25 @@
+# UVR Local GPU worker — Python 3.10
+# Primary backend: MSST-WebUI (mount the repo at /msst, set MSST_ROOT)
+# Fallback backend: pymss (uncomment to enable)
+
+# --- PyTorch (CUDA 12.8) ---
+torch==2.8.0+cu128 --index-url https://download.pytorch.org/whl/cu128
+torchvision==0.23.0+cu128 --index-url https://download.pytorch.org/whl/cu128
+torchaudio==2.8.0+cu128 --index-url https://download.pytorch.org/whl/cu128
+
+# --- API ---
+fastapi==0.115.0
+uvicorn[standard]==0.34.0
+python-multipart==0.0.12
+websockets==13.1
+python-dotenv==1.0.1
+
+# --- Audio / DSP ---
+numpy==1.26.4
+scipy>=1.11
+soundfile>=0.12
+librosa==0.9.2
+safetensors>=0.4
+
+# --- Optional fallback backend (uncomment to enable) ---
+# pymss[server]==0.4.0

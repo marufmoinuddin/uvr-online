@@ -1,0 +1,317 @@
+{
+  "bs_roformer_voc_hyperacev2": {
+    "name": "BS-RoFormer Vocals HyperACE v2",
+    "arch": "BS-RoFormer",
+    "target": "vocals",
+    "tags": [
+      "clean",
+      "low-bleed"
+    ],
+    "sizeMB": 180,
+    "source": "pcunwa/BS-Roformer-HyperACE",
+    "sdr": 12.4,
+    "checkpoint": "bs_roformer_voc_hyperacev2.ckpt",
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "download": {
+      "repo": "pcunwa/BS-Roformer-HyperACE",
+      "revision": "main",
+      "files": [
+        {
+          "remote": "v2_voc/bs_roformer_voc_hyperacev2.ckpt",
+          "dest": "bs_roformer_voc_hyperacev2.ckpt",
+          "size": 288724430
+        },
+        {
+          "remote": "v2_voc/config.yaml",
+          "dest": "config.yaml",
+          "size": 1969
+        }
+      ]
+    }
+  },
+  "bs_roformer_inst_hyperacev2": {
+    "name": "BS-RoFormer Instrumental HyperACE v2",
+    "arch": "BS-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "clean",
+      "low-bleed"
+    ],
+    "sizeMB": 185,
+    "source": "pcunwa/BS-Roformer-HyperACE",
+    "sdr": 12.1,
+    "checkpoint": "bs_roformer_inst_hyperacev2.ckpt",
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "download": {
+      "repo": "pcunwa/BS-Roformer-HyperACE",
+      "revision": "main",
+      "files": [
+        {
+          "remote": "v2_inst/bs_roformer_inst_hyperacev2.ckpt",
+          "dest": "bs_roformer_inst_hyperacev2.ckpt",
+          "size": 288725646
+        },
+        {
+          "remote": "v2_inst/config.yaml",
+          "dest": "config.yaml",
+          "size": 1973
+        }
+      ]
+    }
+  },
+  "bs_roformer_voc_resurrection": {
+    "name": "BS-RoFormer Vocals Resurrection",
+    "arch": "BS-RoFormer",
+    "target": "vocals",
+    "tags": [
+      "fullness"
+    ],
+    "sizeMB": 204,
+    "source": "pcunwa/BS-Roformer-Resurrection",
+    "sdr": 12.8,
+    "checkpoint": "bs_roformer_voc_resurrection.ckpt",
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "bs_roformer_inst_resurrection": {
+    "name": "BS-RoFormer Instrumental Resurrection",
+    "arch": "BS-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "fullness",
+      "low-bleed"
+    ],
+    "sizeMB": 204,
+    "source": "pcunwa/BS-Roformer-Resurrection",
+    "sdr": 12.5,
+    "checkpoint": "bs_roformer_inst_resurrection.ckpt",
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "bs_polarformer_vocals": {
+    "name": "BS-PolarFormer Vocals",
+    "arch": "BS-PolarFormer",
+    "target": "vocals",
+    "tags": [
+      "clean",
+      "karaoke"
+    ],
+    "sizeMB": 175,
+    "source": "pcunwa/BS-EXP-SiameseRoformer",
+    "sdr": 12.9,
+    "checkpoint": "bs_polarformer_vocals.ckpt",
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mel_band_roformer_deux": {
+    "name": "Mel-Band RoFormer Deux",
+    "arch": "MelBand-RoFormer",
+    "target": "dual",
+    "tags": [
+      "fullness",
+      "balanced"
+    ],
+    "sizeMB": 192,
+    "source": "becruily/mel-band-roformer-deux",
+    "sdr": 11.9,
+    "checkpoint": "becruily_deux.ckpt",
+    "model_type": "vocal_models",
+    "license": "CC-BY-NC-4.0",
+    "download": {
+      "repo": "becruily/mel-band-roformer-deux",
+      "revision": "main",
+      "files": [
+        {
+          "remote": "becruily_deux.ckpt",
+          "dest": "becruily_deux.ckpt",
+          "size": 435006815
+        },
+        {
+          "remote": "config_deux_becruily.yaml",
+          "dest": "config.yaml",
+          "size": 1175
+        }
+      ]
+    }
+  },
+  "mel_band_roformer_flowers_v10": {
+    "name": "Mel-Band RoFormer Flowers v10",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "fullness",
+      "low-bleed"
+    ],
+    "sizeMB": 210,
+    "source": "GaboxR67/MelBandRoformers",
+    "sdr": 12.2,
+    "checkpoint": "mbr_instfv9_gabox.ckpt",
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mel_band_roformer_fv9": {
+    "name": "Mel-Band RoFormer Fv9",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "fullness"
+    ],
+    "sizeMB": 205,
+    "source": "GaboxR67/MelBandRoformers",
+    "sdr": 12.0,
+    "checkpoint": "mbr_instfv9_gabox.ckpt",
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mel_band_roformer_fv8b": {
+    "name": "Mel-Band RoFormer Fv8b",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "fullness",
+      "detail"
+    ],
+    "sizeMB": 200,
+    "source": "GaboxR67/MelBandRoformers",
+    "sdr": 11.8,
+    "checkpoint": "mbr_instfv9_2_gabox.ckpt",
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mel_band_roformer_inst_v1e": {
+    "name": "Mel-Band RoFormer Inst v1e",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "fullness",
+      "classic"
+    ],
+    "sizeMB": 198,
+    "source": "pcunwa/Mel-Band-Roformer-Inst",
+    "sdr": 11.7,
+    "checkpoint": "mbr_instfv9_gabox.ckpt",
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mdx23c_instvoc_hq": {
+    "name": "MDX23C InstVoc HQ",
+    "arch": "MDX23C",
+    "target": "dual",
+    "tags": [
+      "baseline",
+      "hq"
+    ],
+    "sizeMB": 160,
+    "source": "UVR registry / pymss catalog",
+    "sdr": 10.9,
+    "checkpoint": "mdx23c_instvoc_hq.ckpt",
+    "model_type": "vocal_models",
+    "license": "MIT"
+  },
+  "htdemucs_4stem": {
+    "name": "HTDemucs 4-Stem",
+    "arch": "HTDemucs",
+    "target": "4-stem",
+    "tags": [
+      "drums",
+      "bass",
+      "vocals",
+      "other"
+    ],
+    "sizeMB": 320,
+    "source": "facebookresearch/demucs",
+    "sdr": 11.4,
+    "stems": [
+      "drums",
+      "bass",
+      "vocals",
+      "other"
+    ],
+    "checkpoint": "htdemucs_4stem.ckpt",
+    "model_type": "multi_stem_models",
+    "license": "MIT"
+  },
+  "mbr_instfv9_gabox": {
+    "name": "Mel-Band RoFormer Inst Fv9 (Gabox)",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "fullness",
+      "installed"
+    ],
+    "sizeMB": 913,
+    "source": "noblebarkrr/mvsepless_resources",
+    "sdr": 12.0,
+    "installed": true,
+    "checkpoint": "mbr_instfv9_gabox.ckpt",
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mbr_instfv9_2_gabox": {
+    "name": "Mel-Band RoFormer Inst Fv9-2 (Gabox)",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "fullness",
+      "installed"
+    ],
+    "sizeMB": 913,
+    "source": "noblebarkrr/mvsepless_resources",
+    "sdr": 12.0,
+    "installed": true,
+    "checkpoint": "mbr_instfv9_2_gabox.ckpt",
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "becruily_deux": {
+    "name": "Mel-Band RoFormer Deux (becruily)",
+    "arch": "MelBand-RoFormer",
+    "target": "dual",
+    "tags": [
+      "balanced",
+      "installed"
+    ],
+    "sizeMB": 435,
+    "source": "becruily/mel-band-roformer-deux",
+    "sdr": 11.9,
+    "installed": true,
+    "checkpoint": "becruily_deux.ckpt",
+    "model_type": "vocal_models",
+    "license": "CC-BY-NC-4.0",
+    "download": {
+      "repo": "becruily/mel-band-roformer-deux",
+      "revision": "main",
+      "files": [
+        {
+          "remote": "becruily_deux.ckpt",
+          "dest": "becruily_deux.ckpt",
+          "size": 435006815
+        },
+        {
+          "remote": "config_deux_becruily.yaml",
+          "dest": "config.yaml",
+          "size": 1175
+        }
+      ]
+    }
+  },
+  "bs_roformer_inst_hyperacev2_ckpt": {
+    "name": "BS-RoFormer Inst HyperACE v2 (ckpt)",
+    "arch": "BS-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "clean",
+      "low-bleed",
+      "installed"
+    ],
+    "sizeMB": 289,
+    "source": "pcunwa/BS-Roformer-HyperACE",
+    "sdr": 12.1,
+    "installed": true,
+    "checkpoint": "bs_roformer_inst_hyperacev2.ckpt",
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  }
+}

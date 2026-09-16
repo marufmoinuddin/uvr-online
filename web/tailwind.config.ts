@@ -71,6 +71,10 @@ const config: Config = {
           from: { opacity: "0", transform: "scale(0.95)" },
           to: { opacity: "1", transform: "scale(1)" },
         },
+        "scale-out": {
+          from: { opacity: "1", transform: "scale(1)" },
+          to: { opacity: "0", transform: "scale(0.95)" },
+        },
         "fade-in": {
           from: { opacity: "0" },
           to: { opacity: "1" },
@@ -95,6 +99,7 @@ const config: Config = {
       animation: {
         "slide-up": "slide-up 0.4s ease-out both",
         "scale-in": "scale-in 0.2s ease-out both",
+        "scale-out": "scale-out 0.15s ease-in both",
         "fade-in": "fade-in 0.3s ease-out both",
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",

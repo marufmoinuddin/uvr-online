@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   MicOff,
   Mic,
@@ -41,34 +41,51 @@ export function SceneTabs({
   className?: string;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
+  const tabRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
 
   const select = (key: SceneKey) => {
     if (key === active) return;
-    if (pathname.startsWith("/tools")) {
-      router.push(`/tools/${key}`);
-    } else {
-      router.push(`/tools/${key}`);
-    }
+    router.push(`/tools/${key}`);
+  };
+
+  // Arrow-key navigation per the WAI-ARIA tabs pattern. Each tab navigates
+  // to its own page, so arrow keys move focus and activate the next tab.
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const idx = SCENES.findIndex((s) => s.key === active);
+    let next = -1;
+    if (e.key === "ArrowRight") next = (idx + 1) % SCENES.length;
+    else if (e.key === "ArrowLeft") next = (idx - 1 + SCENES.length) % SCENES.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = SCENES.length - 1;
+    if (next === -1) return;
+    e.preventDefault();
+    const key = SCENES[next].key;
+    select(key);
+    tabRefs.current[next]?.focus();
   };
 
   return (
     <div
       role="tablist"
       aria-label="Separation tools"
+      onKeyDown={onKeyDown}
       className={cn(
         "glass-card mx-auto flex max-w-full flex-wrap items-center justify-center gap-1 p-1.5",
         className,
       )}
     >
-      {SCENES.map((scene) => {
+      {SCENES.map((scene, i) => {
         const Icon = ICONS[scene.icon] ?? Music;
         const isActive = scene.key === active;
         return (
           <button
             key={scene.key}
+            ref={(el) => {
+              tabRefs.current[i] = el;
+            }}
             role="tab"
             aria-selected={isActive}
+            aria-controls="workbench-main"
             onClick={() => select(scene.key)}
             className={cn(
               "relative flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50 sm:px-4",

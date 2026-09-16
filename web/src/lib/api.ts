@@ -2,7 +2,6 @@ import type {
   CreateJobRequest,
   CreateJobResponse,
   EnsembleRequest,
-  HealthInfo,
   Job,
   Model,
 } from "./types";
@@ -28,10 +27,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export async function getModels(): Promise<Model[]> {
   return request<Model[]>("/api/models");
-}
-
-export async function getHealth(): Promise<HealthInfo> {
-  return request<HealthInfo>("/api/health");
 }
 
 export async function createJob(

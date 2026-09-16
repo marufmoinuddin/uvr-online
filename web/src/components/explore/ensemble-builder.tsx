@@ -31,6 +31,7 @@ export function EnsembleBuilder({ className }: { className?: string }) {
   const [open, setOpen] = React.useState(false);
   const [plan, setPlan] = React.useState<EnsemblePlan>(defaultPlan());
   const [running, setRunning] = React.useState(false);
+  const [dialogError, setDialogError] = React.useState("");
 
   const addMember = (modelId: string) => {
     const model = models.find((m) => m.id === modelId);
@@ -63,9 +64,10 @@ export function EnsembleBuilder({ className }: { className?: string }) {
   const run = async () => {
     const error = validatePlan(plan);
     if (error) {
-      alert(error);
+      setDialogError(error);
       return;
     }
+    setDialogError("");
     setRunning(true);
     try {
       const res = await createEnsemble({
@@ -86,7 +88,7 @@ export function EnsembleBuilder({ className }: { className?: string }) {
       });
       setOpen(false);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Ensemble failed");
+      setDialogError(err instanceof Error ? err.message : "Ensemble failed");
     } finally {
       setRunning(false);
     }
@@ -110,6 +112,11 @@ export function EnsembleBuilder({ className }: { className?: string }) {
         </DialogHeader>
 
         <div className="space-y-4">
+          {dialogError && (
+            <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-500">
+              {dialogError}
+            </p>
+          )}
           <div className="space-y-2">
             <Label>Add a model</Label>
             <ModelCombobox

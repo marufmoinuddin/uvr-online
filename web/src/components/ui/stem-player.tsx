@@ -40,6 +40,22 @@ function useSyncGroup(group: string, handler: (e: SyncEvent) => void) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Shared AudioContext — one per page, reused across stem players      */
+/* ------------------------------------------------------------------ */
+
+let sharedCtx: AudioContext | null = null;
+function getAudioContext(): AudioContext {
+  if (!sharedCtx || sharedCtx.state === "closed") {
+    sharedCtx = new (
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext
+    )();
+  }
+  return sharedCtx;
+}
+
+/* ------------------------------------------------------------------ */
 /* Waveform — decode peaks via Web Audio, fall back to a placeholder   */
 /* ------------------------------------------------------------------ */
 
@@ -49,9 +65,7 @@ function useWaveform(url: string, color: string) {
 
   React.useEffect(() => {
     let cancelled = false;
-    const ctx = new (window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext })
-        .webkitAudioContext)();
+    const ctx = getAudioContext();
     fetch(url)
       .then((r) => r.arrayBuffer())
       .then((buf) => ctx.decodeAudioData(buf))
@@ -72,11 +86,9 @@ function useWaveform(url: string, color: string) {
       })
       .catch(() => {
         if (!cancelled) setPeaks(null);
-      })
-      .finally(() => ctx.close().catch(() => {}));
+      });
     return () => {
       cancelled = true;
-      ctx.close().catch(() => {});
     };
   }, [url]);
 
@@ -211,12 +223,12 @@ export function StemPlayer({
       </div>
 
       <div className="relative">
-        <canvas ref={canvasRef} className="h-16 w-full rounded-lg" />
+        <canvas ref={canvasRef} className="h-16 w-full rounded-lg" aria-hidden="true" />
         <button
           type="button"
           onClick={toggle}
           aria-label={playing ? "Pause" : "Play"}
-          className="absolute left-1/2 top-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-primary-glow transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50"
+          className="absolute left-1/2 top-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-primary-glow transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50"
         >
           {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 pl-0.5" />}
         </button>
@@ -241,6 +253,7 @@ export function StemPlayer({
         ref={audioRef}
         src={downloadUrl(url)}
         preload="metadata"
+        aria-label={`Audio for ${name}`}
         onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
         onPlay={() => setPlaying(true)}

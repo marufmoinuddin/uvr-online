@@ -42,7 +42,6 @@ const STAGE_ICONS: Record<Job["stage"], React.ReactNode> = {
 
 function JobCard({ job }: { job: Job }) {
   const removeJob = useStore((s) => s.removeJob);
-  const setActiveJob = useStore((s) => s.setActiveJob);
   const [reusing, setReusing] = React.useState(false);
 
   const handleReuse = async () => {
@@ -95,7 +94,9 @@ function JobCard({ job }: { job: Job }) {
           )}
           <button
             type="button"
-            onClick={() => removeJob(job.id)}
+            onClick={() => {
+              if (window.confirm(`Remove "${job.fileName}" from history?`)) removeJob(job.id);
+            }}
             aria-label="Remove job"
             className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-control hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50"
           >
@@ -142,13 +143,6 @@ function JobCard({ job }: { job: Job }) {
             >
               <RefreshCw className={cn("h-4 w-4", reusing && "animate-spin")} />
               Reuse file
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setActiveJob(job.id)}
-            >
-              Open
             </Button>
           </div>
         </div>

@@ -58,12 +58,16 @@ export function ModelManager({ className }: { className?: string }) {
     }
   }, []);
 
-  // Poll while any download is in flight, otherwise refresh on an interval.
+  // Poll while any download is in flight, otherwise refresh less often.
+  const anyDownloading = models.some(
+    (m) => m.download.status === "downloading" || m.download.status === "verifying",
+  );
+
   React.useEffect(() => {
     refresh();
-    const t = setInterval(refresh, 1500);
+    const t = setInterval(refresh, anyDownloading ? 1500 : 15_000);
     return () => clearInterval(t);
-  }, [refresh]);
+  }, [refresh, anyDownloading]);
 
   const act = async (id: string, fn: () => Promise<unknown>) => {
     setBusy((b) => ({ ...b, [id]: true }));
@@ -87,10 +91,6 @@ export function ModelManager({ className }: { className?: string }) {
     if (filter === "available") return m.downloadable && !m.installed;
     return true;
   });
-
-  const anyDownloading = models.some(
-    (m) => m.download.status === "downloading" || m.download.status === "verifying",
-  );
 
   return (
     <section
@@ -274,7 +274,9 @@ function ModelRowView({
           ) : model.installed ? (
             <button
               type="button"
-              onClick={onDelete}
+              onClick={() => {
+                if (window.confirm(`Delete ${model.name}? This cannot be undone.`)) onDelete();
+              }}
               disabled={busy}
               className="flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-red-500/50"
             >

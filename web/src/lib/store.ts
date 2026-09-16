@@ -14,11 +14,13 @@ interface Store {
   selectedModelId: string;
   scene: SceneKey;
   theme: "light" | "dark" | "system";
+  favorites: string[];
 
   setModelCatalog: (models: Model[]) => void;
   selectModel: (id: string) => void;
   setScene: (scene: SceneKey) => void;
   setTheme: (theme: "light" | "dark" | "system") => void;
+  toggleFavorite: (id: string) => void;
   addJob: (job: Job) => void;
   upsertJob: (job: Job) => void;
   syncJobs: (jobs: Job[]) => void;
@@ -36,11 +38,18 @@ export const useStore = create<Store>()(
       selectedModelId: MODEL_CATALOG[0].id,
       scene: "vocal-remover",
       theme: "system",
+      favorites: [],
 
       setModelCatalog: (modelCatalog) => set({ modelCatalog }),
       selectModel: (selectedModelId) => set({ selectedModelId }),
       setScene: (scene) => set({ scene }),
       setTheme: (theme) => set({ theme }),
+      toggleFavorite: (id) =>
+        set({
+          favorites: get().favorites.includes(id)
+            ? get().favorites.filter((f) => f !== id)
+            : [...get().favorites, id],
+        }),
 
       addJob: (job) => set({ jobs: [job, ...get().jobs] }),
       upsertJob: (job) =>
@@ -82,6 +91,7 @@ export const useStore = create<Store>()(
         selectedModelId: s.selectedModelId,
         scene: s.scene,
         theme: s.theme,
+        favorites: s.favorites,
       }),
     },
   ),

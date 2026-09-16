@@ -9,14 +9,18 @@ import {
   Music,
   SlidersHorizontal,
   Layers,
-  Guitar,
   Wrench,
   AudioLines,
-  History,
   ChevronsUpDown,
   AudioWaveform,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
 interface NavItem {
   key: string;
@@ -44,7 +48,7 @@ const GROUPS: NavGroup[] = [
     label: "Separation",
     items: [
       { key: "stem-splitter", label: "Stem Splitter", href: "/tools/stem-splitter", icon: Layers },
-      { key: "instrument-extractor", label: "Instrument Extractor", href: "/tools/vocal-remover", icon: Guitar },
+      { key: "extract-vocals", label: "Extract Vocals", href: "/tools/extract-vocals", icon: MicVocal },
     ],
   },
   {
@@ -57,12 +61,6 @@ const GROUPS: NavGroup[] = [
     label: "Production",
     items: [
       { key: "production", label: "Music Production Tools", href: "/tools/production", icon: AudioLines },
-    ],
-  },
-  {
-    label: "History",
-    items: [
-      { key: "history", label: "Recent History", href: "/tools/vocal-remover", icon: History },
     ],
   },
 ];
@@ -87,24 +85,45 @@ export function WorkbenchSidebar({
         className,
       )}
     >
-      {/* Workspace context */}
-      <button
-        type="button"
-        className="flex h-11 w-full items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-1 pr-2 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50"
-      >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-300">
-          <AudioWaveform className="h-4 w-4" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-medium leading-4 text-muted-foreground">
-            Workspace
-          </span>
-          <span className="block truncate text-sm font-semibold leading-5 text-foreground">
-            Audio tools
-          </span>
-        </span>
-        <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-      </button>
+      {/* Workspace context — dropdown of all tools */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="flex h-11 w-full items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-1 pr-2 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-300">
+              <AudioWaveform className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[11px] font-medium leading-4 text-muted-foreground">
+                Workspace
+              </span>
+              <span className="block truncate text-sm font-semibold leading-5 text-foreground">
+                Audio tools
+              </span>
+            </span>
+            <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-60">
+          {GROUPS.map((group) => (
+            <div key={group.label}>
+              <p className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                {group.label}
+              </p>
+              {group.items.map((item) => (
+                <DropdownMenuItem key={item.key} asChild>
+                  <Link href={item.href} className="flex items-center gap-2">
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+            </div>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {/* Grouped nav */}
       <nav className="flex flex-col gap-4" aria-label="Workbench tools">

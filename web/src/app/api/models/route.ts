@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { MODEL_CATALOG } from "@/lib/models";
+import { toManagedModel } from "@/lib/models-api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -20,5 +21,7 @@ export async function GET() {
   } catch {
     /* fall through to the seeded catalog */
   }
-  return NextResponse.json(MODEL_CATALOG);
+  // Worker unreachable — return the seeded catalog in ManagedModel shape so
+  // consumers can safely read `.download.status` etc.
+  return NextResponse.json(MODEL_CATALOG.map(toManagedModel));
 }

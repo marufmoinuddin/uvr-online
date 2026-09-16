@@ -4,15 +4,19 @@ import * as React from "react";
 import {
   Cpu,
   Search,
-  ChevronDown,
   Star,
-  Check,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
 import { modelTrait, modelsForScene } from "@/lib/models";
 import { licenseFor } from "@/lib/licenses";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import type { Model, SceneKey } from "@/lib/types";
 
 interface ModelSelectionCardProps {
@@ -46,9 +50,8 @@ export function ModelSelectionCard({ scene, className }: ModelSelectionCardProps
   const [query, setQuery] = React.useState("");
   const [usage, setUsage] = React.useState<(typeof USAGE_OPTIONS)[number]>("All passes");
   const [trait, setTrait] = React.useState<(typeof TRAIT_OPTIONS)[number]>("All");
-  const [usageOpen, setUsageOpen] = React.useState(false);
-  const [traitOpen, setTraitOpen] = React.useState(false);
-  const [favorites, setFavorites] = React.useState<Set<string>>(new Set());
+  const favorites = useStore((s) => s.favorites);
+  const toggleFavorite = useStore((s) => s.toggleFavorite);
 
   const sceneModels = React.useMemo(
     () => modelsForScene(scene, models),
@@ -68,15 +71,6 @@ export function ModelSelectionCard({ scene, className }: ModelSelectionCardProps
 
   const selected = sceneModels.find((m) => m.id === selectedModelId);
   const hasFilters = query !== "" || usage !== "All passes" || trait !== "All";
-
-  const toggleFavorite = (id: string) => {
-    setFavorites((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
   return (
     <section
@@ -108,79 +102,43 @@ export function ModelSelectionCard({ scene, className }: ModelSelectionCardProps
 
       {/* Filters */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => {
-              setUsageOpen((o) => !o);
-              setTraitOpen(false);
-            }}
-            className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50"
-            aria-expanded={usageOpen}
-          >
-            Usage
-            <span className="text-muted-foreground">{usage}</span>
-            <ChevronDown className="h-3 w-3 text-muted-foreground" />
-          </button>
-          {usageOpen && (
-            <div className="absolute z-20 mt-1 w-40 overflow-hidden rounded-xl border border-white/10 bg-[#0F1116] p-1 shadow-lg animate-scale-in">
-              {USAGE_OPTIONS.map((u) => (
-                <button
-                  key={u}
-                  type="button"
-                  onClick={() => {
-                    setUsage(u);
-                    setUsageOpen(false);
-                  }}
-                  className={cn(
-                    "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-white/[0.05]",
-                    usage === u ? "text-indigo-300" : "text-foreground",
-                  )}
-                >
-                  {u}
-                  {usage === u && <Check className="h-3.5 w-3.5" />}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <Select
+          value={usage}
+          onValueChange={(v) => setUsage(v as (typeof USAGE_OPTIONS)[number])}
+        >
+          <SelectTrigger className="h-8 w-auto gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-foreground [&>span]:line-clamp-none">
+            <span className="flex items-center gap-1.5">
+              Usage
+              <span className="text-muted-foreground">{usage}</span>
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            {USAGE_OPTIONS.map((u) => (
+              <SelectItem key={u} value={u}>
+                {u}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => {
-              setTraitOpen((o) => !o);
-              setUsageOpen(false);
-            }}
-            className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50"
-            aria-expanded={traitOpen}
-          >
-            Traits
-            <span className="text-muted-foreground">{trait}</span>
-            <ChevronDown className="h-3 w-3 text-muted-foreground" />
-          </button>
-          {traitOpen && (
-            <div className="absolute z-20 mt-1 w-44 overflow-hidden rounded-xl border border-white/10 bg-[#0F1116] p-1 shadow-lg animate-scale-in">
-              {TRAIT_OPTIONS.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => {
-                    setTrait(t);
-                    setTraitOpen(false);
-                  }}
-                  className={cn(
-                    "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-white/[0.05]",
-                    trait === t ? "text-indigo-300" : "text-foreground",
-                  )}
-                >
-                  {t}
-                  {trait === t && <Check className="h-3.5 w-3.5" />}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <Select
+          value={trait}
+          onValueChange={(v) => setTrait(v as (typeof TRAIT_OPTIONS)[number])}
+        >
+          <SelectTrigger className="h-8 w-auto gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-foreground [&>span]:line-clamp-none">
+            <span className="flex items-center gap-1.5">
+              Traits
+              <span className="text-muted-foreground">{trait}</span>
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            {TRAIT_OPTIONS.map((t) => (
+              <SelectItem key={t} value={t}>
+                {t}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <button
           type="button"
@@ -220,7 +178,7 @@ export function ModelSelectionCard({ scene, className }: ModelSelectionCardProps
             key={m.id}
             model={m}
             selected={m.id === selectedModelId}
-            favorite={favorites.has(m.id)}
+            favorite={favorites.includes(m.id)}
             onSelect={() => selectModel(m.id)}
             onToggleFavorite={() => toggleFavorite(m.id)}
           />
@@ -314,7 +272,7 @@ function ModelRow({
           "absolute right-1.5 top-1.5 rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50",
           favorite
             ? "text-amber-400"
-            : "text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground",
+            : "text-muted-foreground opacity-60 hover:opacity-100 hover:text-foreground",
         )}
       >
         <Star className={cn("h-3.5 w-3.5", favorite && "fill-current")} />

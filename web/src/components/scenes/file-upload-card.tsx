@@ -15,6 +15,13 @@ import { useStore } from "@/lib/store";
 import { modelsForScene } from "@/lib/models";
 import { createJob } from "@/lib/api";
 import { listManagedModels, type ManagedModel } from "@/lib/models-api";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import type { SceneKey } from "@/lib/types";
 
 const ACCEPTED = ["mp3", "wav", "flac", "m4a", "ogg", "aac", "wma", "aiff", "mp4", "mov", "mkv", "webm"];
@@ -69,18 +76,28 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
   const [files, setFiles] = React.useState<File[]>([]);
   const [dragActive, setDragActive] = React.useState(false);
   const [outputFormat, setOutputFormat] = React.useState<"mp3" | "wav" | "flac">("mp3");
-  const [formatOpen, setFormatOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [uploadPct, setUploadPct] = React.useState(0);
+  const [rejectionMessage, setRejectionMessage] = React.useState("");
+  const [jobError, setJobError] = React.useState("");
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   const addFiles = React.useCallback((list: FileList | File[] | null) => {
     if (!list) return;
-    const incoming = Array.from(list).filter((f) => {
+    setJobError("");
+    const all = Array.from(list);
+    const incoming = all.filter((f) => {
       const ext = f.name.split(".").pop()?.toLowerCase() ?? "";
       return ACCEPTED.includes(ext) && f.size <= MAX_BYTES;
     });
     setFiles((prev) => [...prev, ...incoming].slice(0, MAX_FILES));
+    if (incoming.length < all.length) {
+      const count = all.length - incoming.length;
+      setRejectionMessage(
+        `${count} file${count > 1 ? "s" : ""} rejected (unsupported format or exceeds ${formatBytes(MAX_BYTES)})`,
+      );
+      setTimeout(() => setRejectionMessage(""), 5000);
+    }
   }, []);
 
   const removeFile = (index: number) => {
@@ -117,7 +134,7 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
       setFiles([]);
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : "Failed to start job");
+      setJobError(err instanceof Error ? err.message : "Failed to start job");
     } finally {
       setSubmitting(false);
     }
@@ -138,14 +155,29 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
           </span>
           <h2 className="text-base font-bold text-foreground">File Upload</h2>
         </div>
-        <button
-          type="button"
-          aria-label="Supports MP3, WAV, FLAC and most video formats (Max 100MB)"
-          title="Supports MP3, WAV, FLAC and most video formats (Max 100MB)"
-          className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50"
-        >
-          <Info className="h-4 w-4" />
-        </button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label="Supported formats and limits"
+              className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50"
+            >
+              <Info className="h-4 w-4" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-72">
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Supported files</p>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {ACCEPTED.map((e) => e.toUpperCase()).join(", ")}
+              </p>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Up to {MAX_FILES} files at once, max {formatBytes(MAX_BYTES)}{" "}
+                each.
+              </p>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -234,18 +266,22 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
             </div>
           )}
         </div>
-
+      {/* Error messages */}
+      {rejectionMessage && (
+        <p className="mt-2 text-xs text-amber-500">{rejectionMessage}</p>
+      )}
+      {jobError && (
+        <p className="mt-2 text-xs text-red-500">{jobError}</p>
+      )}
         {/* Controls — 360px column, 12px padding, 72px group + 20px gap + 44px row */}
         <div className="flex flex-col gap-5 p-3">
           {/* Output format + Models (2-col, 72px tall) */}
           <div className="grid grid-cols-2 gap-2">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setFormatOpen((o) => !o)}
-                className="flex h-[72px] w-full flex-col items-start justify-center gap-0.5 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50"
-                aria-expanded={formatOpen}
-              >
+            <Select
+              value={outputFormat}
+              onValueChange={(v) => setOutputFormat(v as "mp3" | "wav" | "flac")}
+            >
+              <SelectTrigger className="h-[72px] w-full flex-col items-start justify-center gap-0.5 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-left [&>span]:line-clamp-none [&>svg]:hidden">
                 <span className="flex w-full items-center justify-between">
                   <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     Output format
@@ -258,31 +294,20 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
                 <span className="text-xs leading-4 text-muted-foreground">
                   {outputFormat === "mp3" ? "320 kbps" : "Lossless"}
                 </span>
-              </button>
-              {formatOpen && (
-                <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-white/10 bg-[#0F1116] shadow-lg animate-scale-in">
-                  {(["mp3", "wav", "flac"] as const).map((f) => (
-                    <button
-                      key={f}
-                      type="button"
-                      onClick={() => {
-                        setOutputFormat(f);
-                        setFormatOpen(false);
-                      }}
-                      className={cn(
-                        "flex w-full items-center justify-between px-3 py-2 text-sm transition-colors hover:bg-white/[0.05]",
-                        outputFormat === f ? "text-indigo-300" : "text-foreground",
-                      )}
-                    >
+              </SelectTrigger>
+              <SelectContent>
+                {(["mp3", "wav", "flac"] as const).map((f) => (
+                  <SelectItem key={f} value={f}>
+                    <span className="flex items-center justify-between gap-4">
                       <span>{f.toUpperCase()}</span>
                       <span className="text-xs text-muted-foreground">
                         {f === "mp3" ? "320 kbps" : "Lossless"}
                       </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             {/* Models — every model is open-source and free */}
             <a
@@ -311,9 +336,9 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
                     <span className="text-emerald-400">Cached locally</span>{" "}
                     · {formatBytes(selectedStatus.sizeBytes)}
                   </>
-                ) : selectedStatus.download.status === "downloading" ? (
+                ) : selectedStatus.download?.status === "downloading" ? (
                   <span className="text-indigo-300">
-                    Downloading model… {selectedStatus.download.percent.toFixed(0)}%
+                    Downloading model… {selectedStatus.download?.percent.toFixed(0)}%
                   </span>
                 ) : selectedStatus.downloadable ? (
                   <>

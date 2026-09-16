@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, Moon, Sun, Monitor, AudioWaveform, X } from "lucide-react";
+import { Menu, Moon, Sun, Monitor, AudioWaveform, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,9 +31,23 @@ export function Header() {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const menuToggleRef = React.useRef<HTMLButtonElement>(null);
+
+  // Close mobile menu on Escape and restore focus to the toggle.
+  React.useEffect(() => {
+    if (!mobileOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMobileOpen(false);
+        menuToggleRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [mobileOpen]);
 
   const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
+    href === "/" ? pathname === "/" : pathname === href;
 
   return (
     <header className="glass-surface fixed inset-x-0 top-0 z-40 border-b border-glass-border">
@@ -83,12 +97,15 @@ export function Header() {
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => setTheme("light")}>
                 <Sun className="h-4 w-4" /> Light
+                {theme === "light" && <Check className="ml-auto h-4 w-4" />}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setTheme("dark")}>
                 <Moon className="h-4 w-4" /> Dark
+                {theme === "dark" && <Check className="ml-auto h-4 w-4" />}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setTheme("system")}>
                 <Monitor className="h-4 w-4" /> System
+                {theme === "system" && <Check className="ml-auto h-4 w-4" />}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -115,6 +132,7 @@ export function Header() {
           </div>
 
           <Button
+            ref={menuToggleRef}
             variant="ghost"
             size="icon"
             className="md:hidden"

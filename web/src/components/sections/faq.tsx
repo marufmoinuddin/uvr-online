@@ -53,7 +53,7 @@ export function FAQ({ className }: { className?: string }) {
             key={f.q}
             className={cn(
               "glass-card animate-slide-up px-5",
-              `animation-delay-${(i + 1) * 100}`,
+              `animation-delay-${((i % 5) + 1) * 100}`,
             )}
           >
             <AccordionItem value={f.q} className="border-0">

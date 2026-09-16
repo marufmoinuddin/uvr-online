@@ -11,7 +11,19 @@ export const metadata: Metadata = {
     "Browse 80+ open-source separation models — BS-RoFormer, Mel-Band RoFormer, MDX23C, HTDemucs and more.",
 };
 
-export default function ExplorePage() {
+export default function ExplorePage({
+  searchParams,
+}: {
+  searchParams: { compare?: string };
+}) {
+  const compareIds = (searchParams.compare ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const compareModels = MODEL_CATALOG.filter((m) =>
+    compareIds.includes(m.id),
+  );
+
   return (
     <div className="mx-auto max-w-container space-y-10 px-4 py-10">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
@@ -28,7 +40,7 @@ export default function ExplorePage() {
       </div>
       <ModelManager />
       <ModelMatrix models={MODEL_CATALOG} />
-      <ComparisonPlayer entries={[]} />
+      <ComparisonPlayer entries={[]} models={compareModels} />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AudioWaveform, Github, Twitter, Youtube, MessageCircle } from "lucide-react";
+import { AudioWaveform } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Accordion,
@@ -17,10 +17,10 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
     links: [
       { label: "Vocal Remover", href: "/tools/vocal-remover" },
       { label: "Extract Vocals", href: "/tools/extract-vocals" },
-      { label: "Karaoke Maker", href: "/tools/karaoke-maker" },
+      { label: "Karaoke Maker", href: "/tools/karaoke" },
       { label: "Stem Splitter", href: "/tools/stem-splitter" },
-      { label: "Noise Removal", href: "/tools/remove-background-noise" },
-      { label: "Acapella Extractor", href: "/tools/acapella-extractor" },
+      { label: "Noise Removal", href: "/tools/denoise" },
+      { label: "Acapella Extractor", href: "/tools/acapella" },
     ],
   },
   {
@@ -28,36 +28,12 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
     links: [
       { label: "Explore models", href: "/explore" },
       { label: "Free & open", href: "/pricing" },
-      { label: "Changelog", href: "/changelog" },
-      { label: "Desktop app", href: "/desktop" },
-      { label: "API", href: "/docs" },
     ],
   },
   {
     title: "Support",
-    links: [
-      { label: "FAQ", href: "/faq" },
-      { label: "Contact", href: "/contact" },
-      { label: "Status", href: "/status" },
-      { label: "Community", href: "/community" },
-    ],
+    links: [{ label: "FAQ", href: "/faq" }],
   },
-  {
-    title: "Legal",
-    links: [
-      { label: "Terms", href: "/legal/terms" },
-      { label: "Privacy", href: "/legal/privacy" },
-      { label: "Cookies", href: "/legal/cookies" },
-      { label: "DMCA", href: "/legal/dmca" },
-    ],
-  },
-];
-
-const SOCIALS = [
-  { label: "GitHub", href: "https://github.com", icon: Github },
-  { label: "Twitter", href: "https://twitter.com", icon: Twitter },
-  { label: "YouTube", href: "https://youtube.com", icon: Youtube },
-  { label: "Discord", href: "https://discord.com", icon: MessageCircle },
 ];
 
 export function Footer() {
@@ -77,20 +53,6 @@ export function Footer() {
               Professional vocal &amp; music separation, running 100% on your own
               GPU. No uploads, no limits.
             </p>
-            <div className="mt-4 flex gap-2">
-              {SOCIALS.map((s) => (
-                <a
-                  key={s.label}
-                  href={s.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={s.label}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-glass-border text-muted-foreground transition-all hover:border-primary/40 hover:text-primary hover:shadow-primary-glow focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50"
-                >
-                  <s.icon className="h-4 w-4" />
-                </a>
-              ))}
-            </div>
           </div>
           {COLUMNS.map((col) => (
             <div key={col.title} className="col-span-2">

@@ -20,9 +20,15 @@ export async function generateMetadata({
   };
 }
 
-export default function ScenePage({ params }: { params: { scene: string } }) {
+export default function ScenePage({
+  params,
+  searchParams,
+}: {
+  params: { scene: string };
+  searchParams: { model?: string };
+}) {
   const scene = params.scene as SceneKey;
   if (!SCENES.some((s) => s.key === scene)) notFound();
 
-  return <Workbench scene={scene} />;
+  return <Workbench scene={scene} initialModelId={searchParams.model} />;
 }

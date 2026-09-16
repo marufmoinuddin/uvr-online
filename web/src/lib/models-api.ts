@@ -40,6 +40,34 @@ export interface StorageInfo {
   totalBytes: number;
 }
 
+/**
+ * Convert a catalog Model into a ManagedModel with default cache state.
+ * Used when the worker is unreachable so consumers always see a full
+ * `download` object instead of undefined.
+ */
+export function toManagedModel(m: Model): ManagedModel {
+  return {
+    ...m,
+    installed: m.installed ?? false,
+    path: "",
+    sizeBytes: 0,
+    downloadable: true,
+    repo: null,
+    revision: null,
+    download: {
+      status: "idle",
+      error: null,
+      receivedBytes: 0,
+      totalBytes: 0,
+      percent: 0,
+      speedBps: 0,
+      etaSec: null,
+      retries: 0,
+      currentFile: null,
+    },
+  };
+}
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, init);
   if (!res.ok) {

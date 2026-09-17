@@ -107,7 +107,12 @@ export function FreeOpenSection({ className }: { className?: string }) {
           the licenses actually declared upstream, verified against each model
           repository.
         </p>
-        <div className="mt-4 overflow-x-auto">
+        <div
+          className="mt-4 overflow-x-auto focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50 rounded-lg"
+          role="region"
+          aria-label="Model license breakdown"
+          tabIndex={0}
+        >
           <table className="w-full min-w-[520px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">

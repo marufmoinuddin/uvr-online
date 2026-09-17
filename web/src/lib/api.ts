@@ -159,17 +159,23 @@ export function subscribeJobs(
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
   let delay = 2000;
 
+    let wsConnected = false;
+
   const schedulePoll = () => {
     if (closed) return;
     pollTimer = setTimeout(async () => {
-      try {
-        const jobs = await request<Job[]>("/api/jobs");
-        delay = 2000; // healthy — resume normal cadence
-        if (onSync) onSync(jobs);
-        else jobs.forEach(onJob);
-      } catch {
-        // Worker unreachable — back off so we don't hammer it.
-        delay = Math.min(delay * 2, 30_000);
+      // Skip polling when WebSocket is connected — it delivers updates in
+      // real time and polling would just add redundant traffic.
+      if (!wsConnected) {
+        try {
+          const jobs = await request<Job[]>("/api/jobs");
+          delay = 2000; // healthy — resume normal cadence
+          if (onSync) onSync(jobs);
+          else jobs.forEach(onJob);
+        } catch {
+          // Worker unreachable — back off so we don't hammer it.
+          delay = Math.min(delay * 2, 30_000);
+        }
       }
       schedulePoll();
     }, delay);
@@ -178,7 +184,10 @@ export function subscribeJobs(
 
   try {
     ws = new WebSocket(`${WS_URL}/ws/jobs`);
-    ws.onopen = () => onOpen?.();
+    ws.onopen = () => {
+      wsConnected = true;
+      onOpen?.();
+    };
     ws.onmessage = (ev) => {
       try {
         const job = JSON.parse(ev.data as string) as Job;
@@ -188,11 +197,15 @@ export function subscribeJobs(
       }
     };
     ws.onerror = () => {
+      wsConnected = false;
       try {
         ws?.close();
       } catch {
         /* ignore */
       }
+    };
+    ws.onclose = () => {
+      wsConnected = false;
     };
   } catch {
     /* polling covers it */

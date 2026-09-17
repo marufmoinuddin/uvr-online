@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { jsonResponse } from "@/lib/http-json";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -27,12 +28,20 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/** GET /api/jobs — list all jobs (used by the polling fallback). */
-export async function GET() {
+/** GET /api/jobs — list all jobs (used by the polling fallback).
+ *
+ * Served with an ETag so an unchanged job list revalidates to an empty 304
+ * instead of re-sending the full list on every poll. `no-cache` forces
+ * revalidation, so progress updates are never served stale.
+ */
+export async function GET(request: Request) {
   try {
     const res = await fetch(`${API_URL}/api/jobs`);
     const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    if (!res.ok) {
+      return NextResponse.json(data, { status: res.status });
+    }
+    return jsonResponse(data, request);
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to list jobs" },

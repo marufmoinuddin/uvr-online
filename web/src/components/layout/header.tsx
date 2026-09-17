@@ -54,9 +54,13 @@ export function Header() {
       <div className="mx-auto flex h-[81px] w-full items-center justify-between gap-4 px-4 sm:px-8">
         <Link
           href="/"
+          aria-label="UVR Local"
           className="flex items-center gap-2 font-semibold focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50 rounded-lg"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-primary-glow">
+          <span
+            className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-primary-glow"
+            aria-hidden
+          >
             <AudioWaveform className="h-4 w-4" />
           </span>
           <span className="hidden sm:inline">UVR Local</span>

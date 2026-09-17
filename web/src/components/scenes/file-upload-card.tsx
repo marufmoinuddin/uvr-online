@@ -38,6 +38,16 @@ const ACCEPTED = ["mp3", "wav", "flac", "m4a", "ogg", "aac", "wma", "aiff", "mp4
 const MAX_FILES = 5;
 const MAX_BYTES = 100 * 1024 * 1024; // 100 MB per file
 
+/** Scene-specific CTA so the primary action speaks the user's language. */
+const PROCESS_LABEL: Partial<Record<SceneKey, string>> = {
+  "vocal-remover": "Separate vocals",
+  "extract-vocals": "Extract vocals",
+  karaoke: "Make karaoke",
+  "stem-splitter": "Split stems",
+  denoise: "Remove noise",
+  acapella: "Extract acapella",
+};
+
 interface FileUploadCardProps {
   scene: SceneKey;
   className?: string;
@@ -51,6 +61,7 @@ interface FileUploadCardProps {
 export function FileUploadCard({ scene, className }: FileUploadCardProps) {
   const selectedModelId = useStore((s) => s.selectedModelId);
   const addJob = useStore((s) => s.addJob);
+  const backendOnline = useStore((s) => s.backendOnline);
   const catalog = useStore((s) => s.modelCatalog);
   const modelCount = React.useMemo(
     () => modelsForScene(scene, catalog).length,
@@ -67,19 +78,28 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
     React.useState<ManagedModel | null>(null);
   React.useEffect(() => {
     let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
     const load = async () => {
       try {
         const all = await listManagedModels();
-        if (!cancelled) setSelectedStatus(all.find((m) => m.id === selectedModelId) ?? null);
+        if (cancelled) return;
+        const found = all.find((m) => m.id === selectedModelId) ?? null;
+        setSelectedStatus(found);
+        // Poll fast only while a download is in flight; otherwise settle into
+        // a slow cadence so we don't hammer the worker.
+        const downloading =
+          found?.download?.status === "downloading" ||
+          found?.download?.status === "verifying";
+        if (timer) clearInterval(timer);
+        timer = setInterval(load, downloading ? 1500 : 15_000);
       } catch {
         /* worker unreachable — leave the last known state */
       }
     };
     load();
-    const t = setInterval(load, 1500);
     return () => {
       cancelled = true;
-      clearInterval(t);
+      if (timer) clearInterval(timer);
     };
   }, [selectedModelId]);
 
@@ -150,6 +170,25 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
       setSubmitting(false);
     }
   };
+
+  // Ctrl/Cmd+Enter submits the queued files — an accelerator for repeat users.
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        if (files.length > 0 && !submitting && !isEnsemble && backendOnline !== false) {
+          e.preventDefault();
+          if (files.length > 1) setConfirmBatch(true);
+          else handleProcess();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files.length, submitting, isEnsemble, backendOnline]);
+
+  const processLabel = PROCESS_LABEL[scene] ?? "Process audio";
+  const offline = backendOnline === false;
 
   return (
     <section
@@ -292,7 +331,7 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
               value={outputFormat}
               onValueChange={(v) => setOutputFormat(v as "mp3" | "wav" | "flac")}
             >
-              <SelectTrigger className="h-[72px] w-full flex-col items-start justify-center gap-0.5 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-left [&>span]:line-clamp-none [&>svg]:hidden">
+              <SelectTrigger className="h-[72px] w-full flex-col items-start justify-center gap-0.5 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-left [&>span]:line-clamp-none [&>svg]:hidden" aria-label="Output format">
                 <span className="flex w-full items-center justify-between">
                   <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     Output format
@@ -373,15 +412,17 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
                 if (files.length > 1) setConfirmBatch(true);
                 else handleProcess();
               }}
-              disabled={files.length === 0 || submitting || isEnsemble}
+              disabled={files.length === 0 || submitting || isEnsemble || offline}
               title={
-                isEnsemble
-                  ? "Ensemble presets fuse the results of existing jobs — run 2 or more separations first, then use the Ensemble builder on the Explore page."
-                  : undefined
+                offline
+                  ? "The processing service is offline — jobs cannot be submitted until it comes back."
+                  : isEnsemble
+                    ? "Ensemble presets fuse the results of existing jobs — run 2 or more separations first, then use the Ensemble builder on the Explore page."
+                    : undefined
               }
               className={cn(
                 "flex h-11 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50",
-                files.length > 0 && !submitting && !isEnsemble
+                files.length > 0 && !submitting && !isEnsemble && !offline
                   ? "bg-white text-black hover:bg-white/90 shadow-[0_0_22px_-6px_rgba(255,255,255,0.4)]"
                   : "bg-white/[0.05] text-muted-foreground",
               )}
@@ -393,7 +434,7 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
                 </>
               ) : (
                 <>
-                  Process audio
+                  {processLabel}
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}

@@ -36,9 +36,11 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
 export function SceneTabs({
   active,
   className,
+  controlsId,
 }: {
   active: SceneKey;
   className?: string;
+  controlsId?: string;
 }) {
   const router = useRouter();
   const tabRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
@@ -85,7 +87,7 @@ export function SceneTabs({
             }}
             role="tab"
             aria-selected={isActive}
-            aria-controls="workbench-main"
+            {...(controlsId ? { 'aria-controls': controlsId } : {})}
             onClick={() => select(scene.key)}
             className={cn(
               "relative flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50 sm:px-4",

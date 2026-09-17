@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 export default function ToolsPage() {
   return (
     <div className="pt-10">
+      <h1 className="sr-only">Tools</h1>
       <FeatureTour />
     </div>
   );

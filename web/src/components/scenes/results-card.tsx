@@ -33,6 +33,20 @@ export function ResultsCard({ className }: { className?: string }) {
     [jobs],
   );
 
+  // Track status transitions for screen-reader announcements.
+  const prevStatusRef = React.useRef<Map<string, string>>(new Map());
+  const [liveMessage, setLiveMessage] = React.useState("");
+  React.useEffect(() => {
+    for (const j of sorted) {
+      const prev = prevStatusRef.current.get(j.id);
+      const current = `${j.status}${j.progress > 0 && j.status === "processing" ? ` ${j.progress}%` : ""}`;
+      if (prev && prev !== current) {
+        setLiveMessage(`${j.fileName} — ${current}`);
+      }
+      prevStatusRef.current.set(j.id, current);
+    }
+  }, [sorted]);
+
   return (
     <section
       className={cn(
@@ -106,11 +120,17 @@ export function ResultsCard({ className }: { className?: string }) {
           </p>
         </div>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {sorted.map((job) => (
-            <JobCard key={job.id} job={job} />
-          ))}
-        </div>
+        <>
+          {/* Screen-reader announcements for job status transitions */}
+          <div aria-live="polite" className="sr-only">
+            {liveMessage}
+          </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {sorted.map((job) => (
+              <JobCard key={job.id} job={job} />
+            ))}
+          </div>
+        </>
       )}
     </section>
   );

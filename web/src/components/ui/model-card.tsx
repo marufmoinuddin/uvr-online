@@ -50,7 +50,9 @@ export function ModelCard({
             {lic.label}
           </Badge>
           {model.sdr != null && (
-            <Badge variant="secondary">SDR {model.sdr.toFixed(1)}</Badge>
+            <Badge variant="secondary" title="Signal-to-Distortion Ratio — higher means cleaner separation">
+              SDR {model.sdr.toFixed(1)}
+            </Badge>
           )}
         </div>
       </div>

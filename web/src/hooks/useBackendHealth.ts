@@ -33,7 +33,9 @@ export function useBackendHealth() {
       }
       if (cancelled) return;
       setBackendOnline(online);
-      delay = online ? 5000 : 2000;
+      // Use the same cadence both ways to avoid flooding the console with
+      // ERR_CONNECTION_REFUSED when the worker is unreachable.
+      delay = 5000;
       timer = setTimeout(check, delay);
     };
 

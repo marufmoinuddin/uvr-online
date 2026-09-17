@@ -107,7 +107,7 @@ export function ModelSelectionCard({ scene, className }: ModelSelectionCardProps
           value={usage}
           onValueChange={(v) => setUsage(v as (typeof USAGE_OPTIONS)[number])}
         >
-          <SelectTrigger className="h-8 w-auto gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-foreground [&>span]:line-clamp-none">
+          <SelectTrigger className="h-8 w-auto gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-foreground [&>span]:line-clamp-none" aria-label="Usage">
             <span className="flex items-center gap-1.5">
               Usage
               <span className="text-muted-foreground">{usage}</span>
@@ -126,7 +126,7 @@ export function ModelSelectionCard({ scene, className }: ModelSelectionCardProps
           value={trait}
           onValueChange={(v) => setTrait(v as (typeof TRAIT_OPTIONS)[number])}
         >
-          <SelectTrigger className="h-8 w-auto gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-foreground [&>span]:line-clamp-none">
+          <SelectTrigger className="h-8 w-auto gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-foreground [&>span]:line-clamp-none" aria-label="Traits">
             <span className="flex items-center gap-1.5">
               Traits
               <span className="text-muted-foreground">{trait}</span>
@@ -236,7 +236,10 @@ function ModelRow({
           </span>
         </span>
         <span className="flex min-w-0 items-center gap-1 overflow-hidden">
-          <span className="shrink-0 rounded-md bg-white/[0.06] px-1.5 py-px text-[11px] font-medium text-foreground/80">
+          <span
+            className="shrink-0 rounded-md bg-white/[0.06] px-1.5 py-px text-[11px] font-medium text-foreground/80"
+            title={`${trait} — a characteristic describing this model's separation style`}
+          >
             {trait}
           </span>
           <span className="shrink-0 text-[11px] text-muted-foreground">{usage}</span>

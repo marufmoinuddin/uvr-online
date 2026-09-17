@@ -189,7 +189,7 @@ function JobCard({ job }: { job: Job }) {
               disabled={reusing}
             >
               <RefreshCw className={cn("h-4 w-4", reusing && "animate-spin")} />
-              Reuse file
+              Re-run
             </Button>
           </div>
         </div>

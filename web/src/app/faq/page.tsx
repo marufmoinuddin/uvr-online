@@ -9,6 +9,7 @@ export const metadata: Metadata = {
 export default function FaqPage() {
   return (
     <div className="pt-10">
+      <h1 className="sr-only">FAQ</h1>
       <FAQ />
     </div>
   );

@@ -66,7 +66,7 @@ export function Workbench({
         className="sticky top-[97px] hidden max-h-[calc(100dvh-7rem)] shrink-0 overflow-y-auto lg:flex"
       />
 
-      <main id="workbench-main" className="min-w-0 flex-1">
+      <section id="workbench-main" className="min-w-0 flex-1" aria-label="Workbench">
         {/* Mobile tool switcher — the sidebar is hidden below lg */}
         <div className="mb-4 lg:hidden">
           <Select value={scene} onValueChange={(v) => router.push(`/tools/${v}`)}>
@@ -102,7 +102,7 @@ export function Workbench({
           <ModelSelectionCard scene={scene} />
           <ResultsCard />
         </div>
-      </main>
+      </section>
     </div>
   );
 }

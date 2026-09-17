@@ -23,6 +23,10 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY . .
 
 # Self-contained inference — no MSST-WebUI checkout is mounted or required.
+# NOTE: deliberately do NOT set AUDIO_SEPARATOR_MODEL_DIR. It globally
+# overrides the model_file_dir passed to Separator(), which would clobber the
+# local model-store path. The registry cache location is chosen per-call in
+# backend.py instead.
 ENV OUTPUT_ROOT=/data/output \
     MODEL_CATALOG=/app/models.json \
     MODEL_STORE=/data/models

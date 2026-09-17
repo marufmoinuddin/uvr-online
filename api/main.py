@@ -19,7 +19,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import mimetypes
+import re
 import shutil
+import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
@@ -31,15 +34,21 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Request,
     UploadFile,
     WebSocket,
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    Response,
+    StreamingResponse,
+)
 
 from backend import list_models
-from job_queue import OUTPUT_ROOT, Job, queue
+from job_queue import OUTPUT_ROOT, UPLOAD_ROOT, Job, queue
 from model_manager import manager as model_manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -171,8 +180,12 @@ async def create_job(
         raise HTTPException(400, f"Unsupported format '{ext}'. Allowed: {sorted(ALLOWED_EXT)}")
 
     opts = json.loads(options or "{}")
-    tmp = Path(tempfile.mkdtemp(prefix="uvr-upload-"))
-    dest = tmp / (file.filename or f"input{ext}")
+    # Keep the upload on the mounted output volume rather than /tmp: /tmp is
+    # wiped when the container restarts, which would break "Re-run" for every
+    # existing job. Also strip any client-supplied directory component.
+    safe_name = Path(file.filename or f"input{ext}").name
+    tmp = Path(tempfile.mkdtemp(prefix="upload-", dir=UPLOAD_ROOT))
+    dest = tmp / safe_name
     size = 0
     with dest.open("wb") as out:
         while chunk := await file.read(1024 * 1024):
@@ -181,7 +194,7 @@ async def create_job(
                 raise HTTPException(413, "File exceeds 1 GB limit")
             out.write(chunk)
 
-    job = await queue.create(scene, model_id, file.filename or dest.name, opts, str(dest))
+    job = await queue.create(scene, model_id, safe_name, opts, str(dest))
     return {"jobId": job.id, "status": job.status, "etaSec": job.eta_sec or 30}
 
 
@@ -243,40 +256,167 @@ async def cancel_job(job_id: str) -> dict:
     return {"id": job_id, "cancelled": True, "status": job.status}
 
 
-@api.get("/jobs/{job_id}/stems/{stem_name}")
-async def get_stem(job_id: str, stem_name: str) -> FileResponse:
-    if job_id == "ensemble":
-        path = _ensemble_dir / stem_name
-        if not path.exists():
-            raise HTTPException(404, "Stem not found")
-        return FileResponse(path, filename=stem_name)
+def _safe_child_name(name: str) -> str:
+    """Reject anything that could escape its directory.
+
+    `stem_name` arrives straight from the URL, so without this a request like
+    `../jobs.json` could read files outside the job's output directory.
+    """
+    if not name or name != Path(name).name or name in (".", ".."):
+        raise HTTPException(400, "Invalid file name")
+    return name
+
+
+def _serve_audio(path: Path, name: str, request: Request) -> Response:
+    """Serve an audio file with HTTP Range support.
+
+    Starlette 0.38's FileResponse ignores `Range` entirely, so it always
+    returns the whole file with 200. Audio players need 206 to seek, and some
+    refuse to scrub at all without it — so range handling is implemented here.
+    """
+    size = path.stat().st_size
+    media = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    base = {
+        "accept-ranges": "bytes",
+        "content-type": media,
+        "cache-control": "private, max-age=3600",
+    }
+
+    raw = (request.headers.get("range") or "").strip()
+    if not raw:
+        return FileResponse(path, media_type=media, headers=base)
+
+    match = re.fullmatch(r"bytes=(\d*)-(\d*)", raw)
+    if not match:
+        return FileResponse(path, media_type=media, headers=base)
+
+    first, last = match.groups()
+    if not first and not last:
+        return Response(status_code=416, headers={**base, "content-range": f"bytes */{size}"})
+
+    if first:
+        start = int(first)
+        end = int(last) if last else size - 1
+    else:
+        # Suffix range: last N bytes.
+        start = max(size - int(last), 0)
+        end = size - 1
+    end = min(end, size - 1)
+
+    if start >= size or start > end:
+        return Response(status_code=416, headers={**base, "content-range": f"bytes */{size}"})
+
+    def _iter():
+        remaining = end - start + 1
+        with path.open("rb") as fh:
+            fh.seek(start)
+            while remaining > 0:
+                chunk = fh.read(min(256 * 1024, remaining))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                yield chunk
+
+    headers = {
+        **base,
+        "content-range": f"bytes {start}-{end}/{size}",
+        "content-length": str(end - start + 1),
+    }
+    return StreamingResponse(_iter(), status_code=206, headers=headers)
+
+
+def _resolve_job_dir(job_id: str) -> Path:
+    """Directory holding a job's stems.
+
+    Normally the queue is the source of truth, but the queue is process-local
+    while the stems are on disk. Falling back to `OUTPUT_ROOT/<job_id>` keeps
+    results reachable after a restart instead of 404ing on files that exist.
+    """
     job = queue.get(job_id)
-    if job is None:
+    if job is not None and job.output_dir:
+        return Path(job.output_dir)
+    # Only accept plain tokens, so `job_id` cannot traverse the filesystem.
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", job_id):
         raise HTTPException(404, "Job not found")
-    path = Path(job.output_dir or "") / stem_name
-    if not path.exists():
+    candidate = OUTPUT_ROOT / job_id
+    if candidate.is_dir():
+        return candidate
+    raise HTTPException(404, "Job not found")
+
+
+@api.get("/jobs/{job_id}/stems/{stem_name}")
+async def get_stem(
+    job_id: str, stem_name: str, request: Request
+) -> Response:
+    name = _safe_child_name(stem_name)
+    if job_id == "ensemble":
+        path = _ensemble_dir / name
+        if not path.is_file():
+            raise HTTPException(404, "Stem not found")
+        return _serve_audio(path, name, request)
+    path = _resolve_job_dir(job_id) / name
+    if not path.is_file():
         raise HTTPException(404, "Stem not found")
-    return FileResponse(path, filename=stem_name)
+    return _serve_audio(path, name, request)
 
 
 @api.get("/jobs/{job_id}/download")
 async def download_bundle(job_id: str, format: str = "zip", lossless: int = 0) -> FileResponse:
-    job = queue.get(job_id)
-    if job is None:
-        raise HTTPException(404, "Job not found")
-    out_dir = Path(job.output_dir or "")
-    if not out_dir.exists():
-        raise HTTPException(410, "Output no longer available")
+    """Bundle a job's stems into a zip.
 
-    if format == "zip":
-        zip_path = out_dir / f"{job.id}.zip"
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-            for f in sorted(out_dir.iterdir()):
-                if f.suffix in (".wav", ".flac", ".mp3"):
-                    zf.write(f, f.name)
-        return FileResponse(zip_path, filename=f"{job.id}.zip", media_type="application/zip")
+    `format` selects what goes in the archive:
+      - `zip`  : stems exactly as produced by the separation run
+      - `wav` / `flac` / `mp3` : transcode every stem to that format first
 
-    raise HTTPException(400, "Unsupported bundle format")
+    `lossless=1` is kept as an alias for `format=wav` so older client links
+    keep working. Previously this parameter was accepted but ignored, which
+    meant the "Lossless WAV" option silently returned whatever the job
+    happened to produce.
+    """
+    target = "wav" if lossless else format.lower()
+    if target not in ("zip", "mp3", "wav", "flac"):
+        raise HTTPException(400, f"Unsupported bundle format '{format}'")
+
+    out_dir = _resolve_job_dir(job_id)
+    stems = [f for f in sorted(out_dir.iterdir()) if f.suffix in (".wav", ".flac", ".mp3")]
+    if not stems:
+        raise HTTPException(410, "No stems available for this job")
+
+    # Build the archive OUTSIDE the output directory so it never pollutes the
+    # stem list (and never gets re-zipped into a later bundle).
+    zip_dir = OUTPUT_ROOT / ".zips"
+    zip_dir.mkdir(parents=True, exist_ok=True)
+    zip_path = zip_dir / f"{job_id}-{target}.zip"
+
+    def _add(zf: zipfile.ZipFile, src: Path) -> None:
+        if target == "zip" or src.suffix.lstrip(".").lower() == target:
+            zf.write(src, src.name)
+            return
+        converted = zip_dir / src.with_suffix(f".{target}").name
+        args = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(src)]
+        if target == "mp3":
+            args += ["-b:a", "320k"]
+        args.append(str(converted))
+        try:
+            subprocess.run(args, check=True, capture_output=True)
+        except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+            detail = getattr(exc, "stderr", b"") or b""
+            logger.warning("ffmpeg conversion failed for %s: %s", src.name, detail[-300:])
+            raise HTTPException(500, f"Could not convert {src.name} to {target}")
+        try:
+            zf.write(converted, converted.name)
+        finally:
+            converted.unlink(missing_ok=True)
+
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in stems:
+            _add(zf, f)
+
+    return FileResponse(
+        zip_path,
+        filename=f"{job_id}-{target}.zip",
+        media_type="application/zip",
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -34,15 +34,13 @@ services:
       - ./api:/app
       - ~/music:/data/input:ro
       - ./output:/data/output
-      # Downloaded model weights. Persisted so weights survive rebuilds and are
-      # only ever fetched once.
-      - model_weights:/data/models
+      # Model cache, bind-mounted read-write so weights live in ./models on the
+      # host — inspectable, seedable by hand (drop in a pre-downloaded
+      # <model_id>/ folder) and persistent across rebuilds.
+      - ./models:/data/models
     environment:
       - OUTPUT_ROOT=/data/output
       - MODEL_CATALOG=/app/models.json
       - MODEL_STORE=/data/models
       - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
     # Standalone inference: no external MSST-WebUI checkout is mounted.
-
-volumes:
-  model_weights:

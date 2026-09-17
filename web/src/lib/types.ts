@@ -38,6 +38,12 @@ export interface Model {
   recommended?: boolean;
   /** Ensemble preset (fuses multiple models). */
   ensemble?: boolean;
+  /**
+   * Set when this model cannot be run by the current backend, holding the
+   * reason. Such models are hidden from the workbench picker so users never
+   * hit a failure they cannot act on.
+   */
+  unsupported?: string | null;
 }
 
 export type JobStatus = "queued" | "processing" | "ready" | "error" | "cancelled";

@@ -25,7 +25,11 @@ interface DownloadBundleProps {
  * Lossless (WAV) vs MP3 320 options are surfaced as separate menu items.
  */
 export function DownloadBundle({ stems, jobId, className }: DownloadBundleProps) {
-  const zipUrl = downloadUrl(`/api/jobs/${jobId}/download?format=zip`);
+  // One `format` parameter per URL. Appending to an existing query produced
+  // duplicate `format=` keys (FastAPI keeps the last), which made the MP3
+  // option request an unsupported bundle and fail with a 400.
+  const bundleUrl = (format: string) =>
+    downloadUrl(`/api/jobs/${jobId}/download?format=${format}`);
 
   const download = (url: string, filename: string) => {
     const a = document.createElement("a");
@@ -34,6 +38,16 @@ export function DownloadBundle({ stems, jobId, className }: DownloadBundleProps)
     document.body.appendChild(a);
     a.click();
     a.remove();
+  };
+
+  /** Save a stem under its real filename (with extension), not the bare name. */
+  const stemFilename = (url: string, fallback: string) => {
+    try {
+      const last = new URL(url, window.location.origin).pathname.split("/").pop();
+      return last ? decodeURIComponent(last) : fallback;
+    } catch {
+      return fallback;
+    }
   };
 
   return (
@@ -46,29 +60,38 @@ export function DownloadBundle({ stems, jobId, className }: DownloadBundleProps)
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel>Download stems</DropdownMenuLabel>
-        {stems.map((s) => (
-          <DropdownMenuItem
-            key={s.name}
-            onSelect={() => download(downloadUrl(s.url), s.name)}
-          >
-            <FileAudio className="h-4 w-4 text-primary" />
-            <span className="capitalize">{s.name}</span>
-            <span className="ml-auto text-xs text-muted-foreground">
-              {s.format.toUpperCase()}
-            </span>
-          </DropdownMenuItem>
-        ))}
+        {stems.map((s) => {
+          const url = downloadUrl(s.url);
+          return (
+            <DropdownMenuItem
+              key={s.name}
+              onSelect={() =>
+                download(url, stemFilename(url, `${s.name}.${s.format}`))
+              }
+            >
+              <FileAudio className="h-4 w-4 text-primary" />
+              <span className="capitalize">{s.name}</span>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {s.format.toUpperCase()}
+              </span>
+            </DropdownMenuItem>
+          );
+        })}
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Bundle</DropdownMenuLabel>
-        <DropdownMenuItem onSelect={() => download(zipUrl, `${jobId}.zip`)}>
+        <DropdownMenuItem onSelect={() => download(bundleUrl("zip"), `${jobId}.zip`)}>
           <FileArchive className="h-4 w-4 text-primary" />
-          All stems (.zip)
+          All stems as produced (.zip)
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => download(`${zipUrl}&lossless=1`, `${jobId}-lossless.zip`)}>
+        <DropdownMenuItem
+          onSelect={() => download(bundleUrl("wav"), `${jobId}-lossless.zip`)}
+        >
           <FileArchive className="h-4 w-4 text-emerald-500" />
           Lossless WAV (.zip)
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => download(`${zipUrl}&format=mp3`, `${jobId}-mp3.zip`)}>
+        <DropdownMenuItem
+          onSelect={() => download(bundleUrl("mp3"), `${jobId}-mp3.zip`)}
+        >
           <FileArchive className="h-4 w-4 text-amber-500" />
           MP3 320 (.zip)
         </DropdownMenuItem>

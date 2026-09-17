@@ -81,6 +81,8 @@ const BASE_MODELS: Model[] = [
   },
   {
     id: "mel_band_roformer_fv9",
+    unsupported:
+      "No download source is configured for this model yet, so it cannot be fetched.",
     name: "Mel-Band RoFormer Fv9",
     arch: "MelBand-RoFormer",
     target: "instrumental",
@@ -314,7 +316,7 @@ export const SCENES: SceneMeta[] = [
     short: "Remove Vocals",
     description: "Remove vocals from any song and keep the instrumental.",
     icon: "mic-off",
-    defaultModelId: "bs_roformer_inst_hyperacev2",
+    defaultModelId: "becruily_deux",
     allowedTargets: ["instrumental", "dual"],
   },
   {
@@ -323,7 +325,7 @@ export const SCENES: SceneMeta[] = [
     short: "Extract Vocals",
     description: "Isolate the vocal track from any song.",
     icon: "mic",
-    defaultModelId: "bs_roformer_voc_hyperacev2",
+    defaultModelId: "becruily_deux",
     allowedTargets: ["vocals", "dual"],
   },
   {
@@ -332,7 +334,7 @@ export const SCENES: SceneMeta[] = [
     short: "Karaoke",
     description: "Turn any song into a karaoke track.",
     icon: "music",
-    defaultModelId: "bs_roformer_inst_hyperacev2",
+    defaultModelId: "becruily_deux",
     allowedTargets: ["instrumental", "dual"],
   },
   {
@@ -360,7 +362,7 @@ export const SCENES: SceneMeta[] = [
     short: "Acapella",
     description: "Extract pure acapella vocals.",
     icon: "mic-vocal",
-    defaultModelId: "bs_roformer_voc_hyperacev2",
+    defaultModelId: "becruily_deux",
     allowedTargets: ["vocals", "dual"],
   },
   {
@@ -369,7 +371,7 @@ export const SCENES: SceneMeta[] = [
     short: "Vocal Tools",
     description: "Dereverb, gender split and vocal effects.",
     icon: "sliders-horizontal",
-    defaultModelId: "bs_roformer_voc_resurrection",
+    defaultModelId: "becruily_deux",
     allowedTargets: ["vocals", "dual"],
   },
   {
@@ -413,5 +415,11 @@ export function modelsForScene(
   models: Model[] = MODEL_CATALOG,
 ): Model[] {
   const meta = getScene(scene);
-  return models.filter((m) => meta.allowedTargets.includes(m.target));
+  return models.filter(
+    (m) =>
+      meta.allowedTargets.includes(m.target) &&
+      // Models the backend cannot load (e.g. a custom architecture its
+      // engine does not implement) are never offered for selection.
+      !m.unsupported,
+  );
 }

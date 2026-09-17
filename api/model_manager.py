@@ -111,6 +111,14 @@ class ModelRecord:
     usage: Optional[str] = None
     recommended: bool = False
     ensemble: bool = False
+    # Set when the catalog knows the current backend cannot load this model
+    # (e.g. a custom architecture audio-separator does not implement). Holds a
+    # human-readable reason. Such models are hidden from selection and refused
+    # up-front, instead of downloading hundreds of MB and then failing.
+    unsupported: Optional[str] = None
+    # Name of the equivalent model in audio-separator's own registry. Used as a
+    # fallback when we have no direct download spec for this catalog entry.
+    registry: Optional[str] = None
 
     @property
     def downloadable(self) -> bool:
@@ -233,6 +241,8 @@ class ModelManager:
                 usage=e.get("usage"),
                 recommended=bool(e.get("recommended")),
                 ensemble=bool(e.get("ensemble")),
+                unsupported=e.get("unsupported") or None,
+                registry=e.get("registry") or None,
             )
         self._registry = registry
         logger.info("Model registry loaded: %d entries", len(registry))
@@ -326,6 +336,8 @@ class ModelManager:
                     "usage": rec.usage,
                     "recommended": rec.recommended,
                     "ensemble": rec.ensemble,
+                    "unsupported": rec.unsupported,
+                    "registry": rec.registry,
                     **st,
                 }
             )

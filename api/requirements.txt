@@ -33,3 +33,11 @@ safetensors>=0.4
 # The `gpu` extra pulls onnxruntime-gpu. Bundles the RoFormer / MDXC / Demucs
 # loaders and fetches model weights straight from Hugging Face.
 audio-separator[gpu]>=0.40,<0.50
+
+# --- Bundled MSST inference (HyperACE etc.) ---
+# api/vendor/msst carries MSST-WebUI's own BS-RoFormer implementation so the
+# app can run checkpoints audio-separator cannot (notably the HyperACE
+# variants, which use FNO layers). Requires neuraloperator for those layers.
+neuraloperator>=2.0.0
+beartype>=0.18.5
+rotary-embedding-torch>=0.6.1

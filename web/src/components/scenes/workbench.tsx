@@ -55,7 +55,13 @@ export function Workbench({
       sceneModels.length > 0 &&
       !sceneModels.some((m) => m.id === selectedModelId)
     ) {
-      selectModel(meta.defaultModelId);
+      // Prefer the scene default, but never select something the picker does
+      // not actually offer (e.g. a model the backend cannot load) — that
+      // would auto-select a model which then fails on Process.
+      const preferred = sceneModels.some((m) => m.id === meta.defaultModelId)
+        ? meta.defaultModelId
+        : sceneModels[0].id;
+      selectModel(preferred);
     }
   }, [sceneModels, selectedModelId, selectModel, meta.defaultModelId]);
 

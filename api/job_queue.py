@@ -27,6 +27,19 @@ OUTPUT_ROOT = Path(
 )
 OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 
+# Job metadata is persisted here so finished jobs (and their stems) stay
+# reachable after a restart. Without this the queue is process-local and every
+# result 404s the moment the container is recreated.
+STATE_PATH = OUTPUT_ROOT / "jobs.json"
+
+# Uploads are kept under the (mounted) output volume rather than /tmp, so
+# "Re-run" still works after a restart.
+UPLOAD_ROOT = OUTPUT_ROOT / "uploads"
+UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+
+# Statuses that can no longer progress once the process has restarted.
+_INTERRUPTED = ("queued", "processing")
+
 
 @dataclass
 class Job:
@@ -62,6 +75,11 @@ class Job:
             "downloadUrls": self.download_urls,
             "error": self.error,
             "cancelled": self.cancelled,
+            # Persisted for restart recovery + "Re-run". Not part of the public
+            # wire shape the UI depends on, but harmless to include.
+            "inputPath": self.input_path,
+            "outputDir": self.output_dir,
+            "options": self.options,
         }
 
 
@@ -79,8 +97,69 @@ class JobQueue:
 
     def start(self) -> None:
         self._loop = asyncio.get_running_loop()
+        self._load()
         if self._worker is None or self._worker.done():
             self._worker = asyncio.create_task(self._run())
+
+    # -- persistence --------------------------------------------------------
+
+    def _save(self) -> None:
+        """Atomically persist job metadata so results survive a restart.
+
+        Written to a temp file and renamed, so a crash mid-write can never
+        leave a truncated `jobs.json`.
+        """
+        try:
+            payload = [self._jobs[i].to_dict() for i in self._order]
+            tmp = STATE_PATH.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(payload), encoding="utf-8")
+            tmp.replace(STATE_PATH)
+        except Exception as exc:  # pragma: no cover - never break a job for this
+            logger.warning("Could not persist job state: %s", exc)
+
+    def _load(self) -> None:
+        """Restore persisted jobs, flagging any that were interrupted."""
+        if not STATE_PATH.exists():
+            return
+        try:
+            rows = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+        except Exception as exc:
+            logger.warning("Could not read %s: %s", STATE_PATH, exc)
+            return
+        restored = 0
+        for row in rows if isinstance(rows, list) else []:
+            try:
+                job = Job(
+                    id=row["id"],
+                    scene=row.get("scene", ""),
+                    model_id=row.get("modelId", ""),
+                    file_name=row.get("fileName", ""),
+                    status=row.get("status", "error"),
+                    stage=row.get("stage", "done"),
+                    progress=float(row.get("progress") or 0.0),
+                    created_at=float(row.get("createdAt") or 0) / 1000.0 or time.time(),
+                    result_stems=row.get("resultStems") or [],
+                    download_urls=row.get("downloadUrls") or [],
+                    error=row.get("error"),
+                    input_path=row.get("inputPath"),
+                    output_dir=row.get("outputDir"),
+                    options=row.get("options") or {},
+                    cancelled=bool(row.get("cancelled")),
+                )
+            except Exception:  # pragma: no cover - skip malformed rows
+                continue
+            # A job that was mid-flight when the process died can never finish.
+            if job.status in _INTERRUPTED:
+                job.status = "error"
+                job.stage = "done"
+                job.error = "Interrupted by a worker restart — please run it again."
+                job.progress = 0.0
+                job.eta_sec = None
+            self._jobs[job.id] = job
+            self._order.append(job.id)
+            restored += 1
+        if restored:
+            logger.info("Restored %d job(s) from %s", restored, STATE_PATH)
 
     async def stop(self) -> None:
         if self._worker:
@@ -113,6 +192,7 @@ class JobQueue:
         async with self._lock:
             self._jobs[job.id] = job
             self._order.append(job.id)
+        self._save()
         await self._broadcast(job)
         self._wake.set()
         return job
@@ -133,6 +213,7 @@ class JobQueue:
                 job.stage = "done"
                 job.progress = 0.0
                 job.eta_sec = None
+        self._save()
         await self._broadcast(job)
         return job
 
@@ -150,6 +231,8 @@ class JobQueue:
                 del self._jobs[jid]
                 self._order.remove(jid)
                 removed += 1
+        if removed:
+            self._save()
         return removed
 
     def remove(self, job_id: str) -> bool:
@@ -162,6 +245,7 @@ class JobQueue:
         del self._jobs[job_id]
         if job_id in self._order:
             self._order.remove(job_id)
+        self._save()
         return True
 
     def queue_depth(self) -> int:
@@ -184,7 +268,18 @@ class JobQueue:
                 self._wake.clear()
                 await self._wake.wait()
                 continue
-            await self._process(job)
+            try:
+                await self._process(job)
+            except asyncio.CancelledError:
+                raise
+            except BaseException:  # noqa: BLE001
+                # Defence in depth: a single bad job must never kill the worker
+                # loop. In particular libraries that call sys.exit() raise
+                # SystemExit, which is a BaseException rather than an Exception.
+                logger.exception("Unexpected failure processing job %s", job.id)
+                job.status = "error"
+                job.stage = "done"
+                job.error = "Internal error while processing this job."
 
     async def _next_queued(self) -> Optional[Job]:
         async with self._lock:
@@ -225,8 +320,9 @@ class JobQueue:
             job.status = "ready"
             job.progress = 100.0
             job.eta_sec = None
+            self._save()
             await self._broadcast(job)
-        except Exception as exc:  # noqa: BLE001
+        except (Exception, SystemExit) as exc:  # noqa: BLE001
             if job.cancelled:
                 job.status = "cancelled"
                 job.stage = "done"
@@ -235,9 +331,22 @@ class JobQueue:
                 await self._broadcast(job)
                 return
             logger.exception("Job %s failed", job.id)
+            if isinstance(exc, SystemExit):
+                # audio-separator calls sys.exit(1) when a checkpoint will not
+                # load (e.g. an architecture it does not implement). SystemExit
+                # derives from BaseException, so a plain `except Exception`
+                # misses it and it tears down the whole worker process. Report
+                # it as a normal job failure instead.
+                job.error = (
+                    "This model could not be loaded — it may use an architecture "
+                    "this backend does not support. See the worker log for the "
+                    "state_dict mismatch."
+                )
+            else:
+                job.error = str(exc) or exc.__class__.__name__
             job.status = "error"
+            self._save()
             job.stage = "done"
-            job.error = str(exc)
             await self._broadcast(job)
 
     def _on_progress(self, job: Job, pct: float, stage: str) -> None:

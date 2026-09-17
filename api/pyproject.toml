@@ -1,0 +1,63 @@
+[project]
+name = "uvr-local-api"
+version = "0.1.0"
+description = "UVR Local GPU worker — standalone (no Docker required)"
+requires-python = ">=3.10,<3.13"
+
+# Mirrors requirements.txt, expressed for uv. Development uses this so the
+# worker can run straight from a checkout without rebuilding a container:
+#
+#     uv sync          # creates .venv and installs everything
+#     uv run uvicorn main:app --host 0.0.0.0 --port 8000
+#
+# Docker still uses requirements.txt, so keep the two in step.
+dependencies = [
+    # --- PyTorch (CUDA 12.8), resolved from the PyTorch index below ---
+    "torch==2.8.0",
+    "torchvision==0.23.0",
+    "torchaudio==2.8.0",
+
+    # --- API ---
+    "fastapi==0.115.0",
+    "uvicorn[standard]==0.34.0",
+    "python-multipart==0.0.12",
+    "websockets==13.1",
+    "python-dotenv==1.0.1",
+
+    # --- Audio / DSP ---
+    "numpy>=2,<3",
+    "scipy>=1.11",
+    "soundfile>=0.12",
+    "librosa>=0.10,<0.12",
+    "safetensors>=0.4",
+
+    # --- Inference: audio-separator (registry + standard checkpoints) ---
+    "audio-separator[gpu]>=0.40,<0.50",
+
+    # --- Vendored MSST inference (HyperACE etc.) ---
+    # api/vendor/msst needs these directly rather than by luck through
+    # audio-separator's dependency tree.
+    "neuraloperator>=2.0.0",
+    "beartype>=0.18.5",
+    "rotary-embedding-torch>=0.6.1",
+    "ml-collections>=1.0.0",
+    "tqdm>=4.66",
+]
+
+# CUDA 12.8 wheels only exist on the PyTorch index, and the local version tag
+# (+cu128) is not on PyPI at all.
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu128" }]
+torchvision = [{ index = "pytorch-cu128" }]
+torchaudio = [{ index = "pytorch-cu128" }]
+
+[tool.uv]
+# The vendored code is imported as `modules.bs_roformer.*`, which requires
+# vendor/msst on sys.path. backend.py adds it at runtime; the package itself is
+# not installed.
+package = false

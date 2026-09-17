@@ -7,6 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.10 python3.10-venv python3-pip ffmpeg libsndfile1 \
+    build-essential libsamplerate0-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -21,10 +22,10 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # App code
 COPY . .
 
-# MSST-WebUI is mounted at /msst (optional; pymss fallback otherwise)
-ENV MSST_ROOT=/msst \
-    OUTPUT_ROOT=/data/output \
-    MODEL_CATALOG=/app/models.json
+# Self-contained inference — no MSST-WebUI checkout is mounted or required.
+ENV OUTPUT_ROOT=/data/output \
+    MODEL_CATALOG=/app/models.json \
+    MODEL_STORE=/data/models
 
 EXPOSE 8000
 

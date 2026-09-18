@@ -120,7 +120,7 @@ const BASE_MODELS: Model[] = [
     target: "dual",
     tags: ["baseline", "hq"],
     sizeMB: 160,
-    source: "UVR registry / pymss catalog",
+    source: "audio-separator model registry",
     sdr: 10.9,
   },
   {

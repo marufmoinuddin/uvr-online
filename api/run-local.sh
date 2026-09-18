@@ -13,13 +13,18 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-# Paths default to the repo layout, so models/ and output/ are the same ones
-# Docker bind-mounts — a job started here is visible to the container and
-# vice versa.
-export OUTPUT_ROOT="${OUTPUT_ROOT:-$PWD/../output}"
+# Paths default to the repo layout. The model store IS shared with Docker (it
+# is host-owned, so a model downloaded either way is reused rather than fetched
+# twice). OUTPUT_ROOT deliberately is NOT shared: the container runs as root, so
+# everything it creates under output/ is root-owned and the host user then
+# cannot create the per-job upload directories. Using a separate output dir
+# avoids needing sudo on every run.
 export MODEL_CATALOG="${MODEL_CATALOG:-$PWD/models.json}"
 export MODEL_STORE="${MODEL_STORE:-$PWD/../models}"
+export OUTPUT_ROOT="${OUTPUT_ROOT:-$PWD/../output-local}"
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-max_split_size_mb:128}"
+
+mkdir -p "$OUTPUT_ROOT"
 
 if ! command -v uv >/dev/null 2>&1; then
   echo "error: 'uv' is not installed. See https://docs.astral.sh/uv/" >&2

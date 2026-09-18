@@ -204,6 +204,7 @@ def _separate_with_msst(
     demix, then derive the complementary stem from the original mix when the
     model targets a single instrument.
     """
+    import librosa
     import numpy as np
     import soundfile as sf
     import torch

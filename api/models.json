@@ -238,7 +238,7 @@
       "hq"
     ],
     "sizeMB": 160,
-    "source": "UVR registry / pymss catalog",
+    "source": "audio-separator model registry",
     "sdr": 10.9,
     "checkpoint": "mdx23c_instvoc_hq.ckpt",
     "model_type": "vocal_models",

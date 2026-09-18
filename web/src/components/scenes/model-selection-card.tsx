@@ -107,11 +107,11 @@ export function ModelSelectionCard({ scene, className }: ModelSelectionCardProps
           value={usage}
           onValueChange={(v) => setUsage(v as (typeof USAGE_OPTIONS)[number])}
         >
-          <SelectTrigger className="h-8 w-auto gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-foreground [&>span]:line-clamp-none" aria-label="Usage">
-            <span className="flex items-center gap-1.5">
+          <SelectTrigger className="h-8 w-auto gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-foreground" aria-label="Usage">
+            <div className="flex items-center gap-1.5">
               Usage
               <span className="text-muted-foreground">{usage}</span>
-            </span>
+            </div>
           </SelectTrigger>
           <SelectContent>
             {USAGE_OPTIONS.map((u) => (
@@ -126,11 +126,11 @@ export function ModelSelectionCard({ scene, className }: ModelSelectionCardProps
           value={trait}
           onValueChange={(v) => setTrait(v as (typeof TRAIT_OPTIONS)[number])}
         >
-          <SelectTrigger className="h-8 w-auto gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-foreground [&>span]:line-clamp-none" aria-label="Traits">
-            <span className="flex items-center gap-1.5">
+          <SelectTrigger className="h-8 w-auto gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-foreground" aria-label="Traits">
+            <div className="flex items-center gap-1.5">
               Traits
               <span className="text-muted-foreground">{trait}</span>
-            </span>
+            </div>
           </SelectTrigger>
           <SelectContent>
             {TRAIT_OPTIONS.map((t) => (

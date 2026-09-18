@@ -334,19 +334,22 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
               value={outputFormat}
               onValueChange={(v) => setOutputFormat(v as "mp3" | "wav" | "flac")}
             >
-              <SelectTrigger className="h-[72px] w-full flex-col items-start justify-center gap-0.5 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-left [&>span]:line-clamp-none [&>svg]:hidden" aria-label="Output format">
-                <span className="flex w-full items-center justify-between">
+              <SelectTrigger className="h-[72px] w-full flex-col items-start justify-center gap-0.5 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-left [&>svg]:hidden" aria-label="Output format">
+                {/* div, not span: the trigger's `[&>span]:` rules outrank a
+                    plain `flex` utility, so a span here is forced to
+                    display:block and the chevron drops to its own line. */}
+                <div className="flex w-full items-center justify-between">
                   <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     Output format
                   </span>
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                </span>
-                <span className="text-sm font-semibold leading-5 text-foreground">
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                </div>
+                <div className="text-sm font-semibold leading-5 text-foreground">
                   {outputFormat.toUpperCase()}
-                </span>
-                <span className="text-xs leading-4 text-muted-foreground">
+                </div>
+                <div className="text-xs leading-4 text-muted-foreground">
                   {outputFormat === "mp3" ? "320 kbps" : "Lossless"}
-                </span>
+                </div>
               </SelectTrigger>
               <SelectContent>
                 {(["mp3", "wav", "flac"] as const).map((f) => (

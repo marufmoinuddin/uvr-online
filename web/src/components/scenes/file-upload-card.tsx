@@ -34,6 +34,9 @@ import {
 } from "@/components/ui/select";
 import type { SceneKey } from "@/lib/types";
 
+// Must stay in sync with ALLOWED_EXT in api/main.py — the worker rejects any
+// extension it does not list, so advertising one here that the API refuses
+// means the user picks a file the dropzone accepts and then gets a 400.
 const ACCEPTED = ["mp3", "wav", "flac", "m4a", "ogg", "aac", "wma", "aiff", "mp4", "mov", "mkv", "webm"];
 const MAX_FILES = 5;
 const MAX_BYTES = 100 * 1024 * 1024; // 100 MB per file
@@ -397,7 +400,7 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
                   </>
                 ) : (
                   <span className="text-amber-400">
-                    Manual model — place the checkpoint in the MSST checkout
+                    Not runnable — this entry has no download source configured
                   </span>
                 )}
               </p>

@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -223,11 +224,15 @@ class JobQueue:
     def clear(self) -> int:
         """Drop all finished jobs (ready / error / cancelled) from the queue.
         Queued and processing jobs are kept so in-flight work is not lost.
+
+        The stems of the dropped jobs are deleted too — otherwise "clear all"
+        left every result on disk forever with no way to reach it again.
         Returns the number of jobs removed."""
         removed = 0
         for jid in list(self._order):
             job = self._jobs[jid]
             if job.status in ("ready", "error", "cancelled"):
+                self._discard_output(job)
                 del self._jobs[jid]
                 self._order.remove(jid)
                 removed += 1
@@ -237,11 +242,13 @@ class JobQueue:
 
     def remove(self, job_id: str) -> bool:
         """Remove a single finished job (ready / error / cancelled) from the
-        queue. Returns True if it was removed, False if it was not found or is
+        queue and delete its stems.
+        Returns True if it was removed, False if it was not found or is
         still active."""
         job = self._jobs.get(job_id)
         if job is None or job.status not in ("ready", "error", "cancelled"):
             return False
+        self._discard_output(job)
         del self._jobs[job_id]
         if job_id in self._order:
             self._order.remove(job_id)
@@ -289,6 +296,23 @@ class JobQueue:
                     return job
         return None
 
+    @staticmethod
+    def _discard_output(job: Job) -> None:
+        """Delete the stems a job wrote, for jobs whose results are gone.
+
+        Used when a job is cancelled (separation cannot be interrupted
+        mid-flight, so cancelling means "discard the result") and when a job is
+        removed or cleared. Without it the audio stayed on disk — tens of MB per
+        song — while nothing in the API could reach it any more.
+        """
+        if job.output_dir:
+            shutil.rmtree(job.output_dir, ignore_errors=True)
+        # Bundle archives are cached per job+format under OUTPUT_ROOT/.zips, so
+        # they would otherwise outlive the stems they were built from and pile
+        # up (36 MB of stale zips after a short test session).
+        for stale in (OUTPUT_ROOT / ".zips").glob(f"{job.id}-*.zip"):
+            stale.unlink(missing_ok=True)
+
     async def _process(self, job: Job) -> None:
         if job.cancelled:
             return
@@ -308,12 +332,22 @@ class JobQueue:
                 lambda p, s: self._on_progress(job, p, s),
             )
             if job.cancelled:
+                self._discard_output(job)
                 job.status = "cancelled"
                 job.stage = "done"
                 job.progress = 0.0
                 job.eta_sec = None
                 await self._broadcast(job)
                 return
+            # A run that produced no audio must not be reported as `ready` —
+            # that hands the user a job with nothing to play or download and no
+            # explanation. Fail loudly instead.
+            if not stems:
+                raise RuntimeError(
+                    "The separation produced no audio. The model may be "
+                    "incompatible with this backend, or the input had no "
+                    "decodable audio stream."
+                )
             job.result_stems = stems
             job.download_urls = [s["url"] for s in stems]
             job.stage = "done"
@@ -324,6 +358,7 @@ class JobQueue:
             await self._broadcast(job)
         except (Exception, SystemExit) as exc:  # noqa: BLE001
             if job.cancelled:
+                self._discard_output(job)
                 job.status = "cancelled"
                 job.stage = "done"
                 job.progress = 0.0

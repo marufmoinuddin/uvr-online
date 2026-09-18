@@ -266,7 +266,7 @@ function ModelRowView({
             {model.installed ? (
               <span className="flex items-center gap-1 rounded-md bg-emerald-500/15 px-1.5 py-px text-[10px] font-semibold text-emerald-400">
                 <CheckCircle2 className="h-2.5 w-2.5" />
-                {model.installedVia === "msst" ? "installed (MSST)" : "installed"}
+                installed
               </span>
             ) : model.downloadable ? (
               <span className="rounded-md bg-white/[0.06] px-1.5 py-px text-[10px] font-medium text-muted-foreground">

@@ -6,8 +6,8 @@ const API_URL = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL 
 
 /**
  * GET /api/models — model catalog.
- * Merges the seeded catalog with the worker's live models.json so newly
- * installed MSST models appear automatically.
+ * Merges the seeded catalog with the worker's live models.json so models
+ * installed on the worker appear automatically.
  *
  * This is the largest API payload (~10 KB) and is polled by the workbench and
  * Explore pages, so it is served gzipped with an ETag: repeat polls become

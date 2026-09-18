@@ -145,7 +145,7 @@ export function downloadUrl(path: string): string {
  * Live job updates. Polling is the primary mechanism (robust, no proxy
  * requirements); WebSocket is used as an enhancement when reachable.
  *
- * `onSync` receives the worker's full job list on every poll so the caller
+ * `onSync` receives the worker's full job list on every sync so the caller
  * can reconcile (and prune jobs the worker no longer knows about).
  * Returns an unsubscribe function.
  */
@@ -158,27 +158,36 @@ export function subscribeJobs(
   let closed = false;
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
   let delay = 2000;
+  let wsConnected = false;
+  /** Re-sync cadence while the socket is live (see schedulePoll). */
+  const RECONCILE_MS = 30_000;
 
-    let wsConnected = false;
+  const sync = async () => {
+    const jobs = await request<Job[]>("/api/jobs");
+    if (onSync) onSync(jobs);
+    else jobs.forEach(onJob);
+  };
 
   const schedulePoll = () => {
     if (closed) return;
-    pollTimer = setTimeout(async () => {
-      // Skip polling when WebSocket is connected — it delivers updates in
-      // real time and polling would just add redundant traffic.
-      if (!wsConnected) {
+    // The socket pushes every job change in real time, so while it is up we
+    // only reconcile on a slow cadence rather than every 2s. That pass is what
+    // prunes jobs deleted in another tab, or jobs the worker forgot when it
+    // restarted: the socket only ever adds/merges a job, it never reports that
+    // one is gone.
+    pollTimer = setTimeout(
+      async () => {
         try {
-          const jobs = await request<Job[]>("/api/jobs");
+          await sync();
           delay = 2000; // healthy — resume normal cadence
-          if (onSync) onSync(jobs);
-          else jobs.forEach(onJob);
         } catch {
           // Worker unreachable — back off so we don't hammer it.
           delay = Math.min(delay * 2, 30_000);
         }
-      }
-      schedulePoll();
-    }, delay);
+        schedulePoll();
+      },
+      wsConnected ? RECONCILE_MS : delay,
+    );
   };
   schedulePoll();
 
@@ -187,6 +196,9 @@ export function subscribeJobs(
     ws.onopen = () => {
       wsConnected = true;
       onOpen?.();
+      // A (re)connect can follow a worker restart (its in-memory jobs are gone)
+      // or a delete in another tab, so reconcile once straight away.
+      void sync().catch(() => {});
     };
     ws.onmessage = (ev) => {
       try {

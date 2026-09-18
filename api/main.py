@@ -26,6 +26,7 @@ import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
+from urllib.parse import unquote
 
 import torch
 from fastapi import (
@@ -68,7 +69,14 @@ app.add_middleware(
 )
 
 MAX_UPLOAD_BYTES = 1024 * 1024 * 1024  # 1 GB
-ALLOWED_EXT = {".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac", ".wma", ".aiff"}
+# Must stay in sync with the dropzone's ACCEPTED list in
+# web/src/components/scenes/file-upload-card.tsx, which offers "audio or video"
+# files. Video containers are fine: the separator decodes the audio track via
+# ffmpeg, and rejecting them here made an accepted upload fail with a 400.
+ALLOWED_EXT = {
+    ".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac", ".wma", ".aiff",
+    ".mp4", ".mov", ".mkv", ".webm",
+}
 
 
 @app.on_event("startup")
@@ -168,6 +176,38 @@ async def model_delete(model_id: str) -> dict:
 # Jobs
 # ---------------------------------------------------------------------------
 
+def _audio_probe_error(path: Path) -> str | None:
+    """Explain why `path` is not usable audio, or None if it decodes.
+
+    Decodes one second with ffmpeg instead of merely asking ffprobe whether a
+    stream exists: ffprobe happily reports an `audio` stream for a truncated or
+    random file (it guesses from the extension) and exits 0, so that check never
+    caught anything. A corrupt upload then died deep inside the separator with an
+    opaque message ("float division by zero", "EOFError").
+    """
+    try:
+        proc = subprocess.run(
+            [
+                "ffmpeg", "-v", "error", "-xerror",
+                "-i", str(path),
+                # Only the first audio track: a video-only file has nothing to
+                # separate, and mapping it explicitly makes that a decode error
+                # here instead of a confusing failure inside the separator.
+                "-map", "0:a:0", "-vn",
+                "-t", "1", "-f", "null", "-",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        # No ffmpeg available — skip the check rather than block every upload.
+        return None
+    if proc.returncode != 0:
+        return "The uploaded file could not be decoded as audio"
+    return None
+
+
 @api.post("/jobs")
 async def create_job(
     file: UploadFile = File(...),
@@ -179,7 +219,23 @@ async def create_job(
     if ext not in ALLOWED_EXT:
         raise HTTPException(400, f"Unsupported format '{ext}'. Allowed: {sorted(ALLOWED_EXT)}")
 
-    opts = json.loads(options or "{}")
+    try:
+        opts = json.loads(options or "{}")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(400, f"Invalid 'options' JSON: {exc.msg}") from exc
+    if not isinstance(opts, dict):
+        raise HTTPException(400, "'options' must be a JSON object")
+
+    # Reject a model that cannot possibly run BEFORE writing the upload to disk.
+    # Previously an unknown or unsupported id was accepted, and the failure only
+    # surfaced later as a confusing error on a job the user had to wait for
+    # ("Permission denied", or "cannot be used with this backend").
+    rec = model_manager.get(model_id)
+    if rec is None:
+        raise HTTPException(400, f"Unknown model '{model_id}'")
+    if rec.unsupported:
+        raise HTTPException(400, f"'{rec.name}' cannot be used: {rec.unsupported}")
+
     # Keep the upload on the mounted output volume rather than /tmp: /tmp is
     # wiped when the container restarts, which would break "Re-run" for every
     # existing job. Also strip any client-supplied directory component.
@@ -187,12 +243,24 @@ async def create_job(
     tmp = Path(tempfile.mkdtemp(prefix="upload-", dir=UPLOAD_ROOT))
     dest = tmp / safe_name
     size = 0
-    with dest.open("wb") as out:
-        while chunk := await file.read(1024 * 1024):
-            size += len(chunk)
-            if size > MAX_UPLOAD_BYTES:
-                raise HTTPException(413, "File exceeds 1 GB limit")
-            out.write(chunk)
+    try:
+        with dest.open("wb") as out:
+            while chunk := await file.read(1024 * 1024):
+                size += len(chunk)
+                if size > MAX_UPLOAD_BYTES:
+                    raise HTTPException(413, "File exceeds 1 GB limit")
+                out.write(chunk)
+
+        if size == 0:
+            raise HTTPException(400, "The uploaded file is empty")
+
+        problem = _audio_probe_error(dest)
+        if problem:
+            raise HTTPException(400, problem)
+    except BaseException:
+        # Never leave a half-written upload directory behind on rejection.
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
 
     job = await queue.create(scene, model_id, safe_name, opts, str(dest))
     return {"jobId": job.id, "status": job.status, "etaSec": job.eta_sec or 30}
@@ -360,6 +428,32 @@ async def get_stem(
     return _serve_audio(path, name, request)
 
 
+def _bundle_stems(job_id: str, out_dir: Path) -> list[Path]:
+    """The files a bundle should contain — exactly the stems the job reports.
+
+    Driven by the job's own `result_stems` rather than a directory glob, so the
+    archive can never disagree with the stem list the API and UI show. Falls
+    back to a glob for the `ensemble` pseudo-job and for directories whose job
+    record is gone.
+    """
+    job = queue.get(job_id)
+    if job is not None and job.result_stems:
+        names = {
+            unquote(Path(s["url"]).name)
+            for s in job.result_stems
+            if s.get("url")
+        }
+        # Missing files are skipped rather than fatal, so one pruned stem
+        # cannot make the whole bundle 500.
+        found = [out_dir / n for n in sorted(names)]
+        present = [p for p in found if p.is_file()]
+        if present:
+            return present
+    return [
+        f for f in sorted(out_dir.iterdir()) if f.suffix in (".wav", ".flac", ".mp3")
+    ]
+
+
 @api.get("/jobs/{job_id}/download")
 async def download_bundle(job_id: str, format: str = "zip", lossless: int = 0) -> FileResponse:
     """Bundle a job's stems into a zip.
@@ -378,7 +472,7 @@ async def download_bundle(job_id: str, format: str = "zip", lossless: int = 0) -
         raise HTTPException(400, f"Unsupported bundle format '{format}'")
 
     out_dir = _resolve_job_dir(job_id)
-    stems = [f for f in sorted(out_dir.iterdir()) if f.suffix in (".wav", ".flac", ".mp3")]
+    stems = _bundle_stems(job_id, out_dir)
     if not stems:
         raise HTTPException(410, "No stems available for this job")
 
@@ -438,6 +532,14 @@ async def create_ensemble(payload: dict) -> dict:
         if job is None or job.status != "ready":
             raise HTTPException(400, f"Job {jid} is not ready")
         jobs.append(job)
+
+    # Each ensemble run replaces the previous one. The response advertises only
+    # the stems just produced, but the ensemble directory is shared by every
+    # run, so leftovers would leak into "Download bundle" (which reads that
+    # directory) and pile up on disk.
+    for stale in _ensemble_dir.iterdir():
+        if stale.is_file():
+            stale.unlink(missing_ok=True)
 
     # Fuse stems in the frequency/time domain (phase-aligned).
     fused = await asyncio.to_thread(_fuse_stems, jobs, mode, weights)

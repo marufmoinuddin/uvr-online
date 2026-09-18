@@ -25,7 +25,7 @@ export interface DownloadState {
 /** A catalog model plus its live local cache state. */
 export interface ManagedModel extends Model {
   installed: boolean;
-  installedVia?: "store" | "msst";
+  installedVia?: "store" | null;
   path: string;
   sizeBytes: number;
   downloadable: boolean;

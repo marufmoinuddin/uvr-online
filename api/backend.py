@@ -245,12 +245,23 @@ def _separate_with_msst(
     config = ConfigDict(raw_cfg)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    state = torch.load(model_path, map_location=device, weights_only=False)
+    # Read the checkpoint into RAM, copy it into the model, then drop it.
+    #
+    # `map_location=device` used to put the whole state dict in VRAM and it
+    # stayed referenced for the rest of the function — i.e. it was still held
+    # during `demix`, which is exactly when memory is tightest. On a 6 GB card a
+    # full-length song already peaks around 5.8 GB, and the kernel OOM-killed the
+    # worker when it did not fit. Loading on the CPU removes that copy from the
+    # GPU entirely (the model is moved over once, by `.to(device)` below).
+    state = torch.load(model_path, map_location="cpu", weights_only=False)
     for key in ("state", "state_dict"):
         if isinstance(state, dict) and key in state:
             state = state[key]
     model.load_state_dict(state)
+    del state
     model = model.to(device).eval()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
     is_stereo = True
     if model_type in ("bs_roformer", "mel_band_roformer"):
@@ -303,15 +314,20 @@ def _separate_with_msst(
         )
 
     for i, instr in enumerate(instruments):
-        if extract_instrumental and str(instr).lower().startswith("vocal"):
-            continue
         _write(str(instr), waveforms[instr].T)
         progress(20 + int((i + 1) / total * 70), f"Saved {instr}")
 
-    # Single-target models: the complement is the original mix minus the target.
+    # Single-target models: also write the complement (the original mix minus
+    # the target) so both sides of the split exist.
+    #
+    # `extract_instrumental` deliberately suppresses NOTHING here. It used to
+    # skip the target when that was vocal-like *and* skip the complement, so a
+    # vocals-target model under the Vocal Remover scene wrote no stems at all —
+    # yet the job still finished as `ready` with an empty output directory. A
+    # job now exposes exactly what the run produced.
     if target:
         others = [i for i in config.training.instruments if i != target]
-        if others and not extract_instrumental:
+        if others:
             _write(str(others[0]), (mix_orig - waveforms[target]).T)
 
     del model
@@ -355,6 +371,11 @@ class _AudioSeparatorBackend:
         extract_instrumental: bool,
         progress: ProgressFn,
     ) -> list[dict[str, Any]]:
+        # Imported locally to match the rest of this module: torch is only
+        # needed once a job actually runs, and importing it eagerly would make
+        # every API process pay the CUDA-init cost at startup.
+        import torch
+
         rec = manager.get(model_id)
 
         # Refuse models the catalog has flagged as unrunnable by this backend.
@@ -469,8 +490,12 @@ class _AudioSeparatorBackend:
             # part. Fall back to the whole stem name if the shape ever differs.
             match = re.search(r"\(([^)]+)\)", out_path.stem)
             stem = match.group(1).strip() if match else out_path.stem
-            if extract_instrumental and stem.lower().startswith("vocal"):
-                continue
+            # Report EVERY stem the run wrote. The library always writes both
+            # sides of the split, so filtering one out here used to make the
+            # job advertise fewer stems than were on disk — while the download
+            # bundle (which globs the directory) still shipped all of them. It
+            # also hid the removed vocals, which is exactly what you want to
+            # hear to judge whether the separation did a good job.
             stems.append(
                 {
                     "name": stem,
@@ -481,8 +506,21 @@ class _AudioSeparatorBackend:
             )
             progress(10 + int((i + 1) / total * 85), f"Saved {stem}")
 
+        # Release the model AND hand the freed VRAM back to the driver.
+        #
+        # `del sep` alone only returns the blocks to PyTorch's caching
+        # allocator, which keeps reporting them as used, so every job left
+        # ~1.2 GB resident. On a 6 GB card that is fatal for the next job: the
+        # MSST path needs ~5.7 GB, and running out of VRAM there aborts the
+        # process with SIGSEGV rather than raising a catchable CUDA error.
+        # (The MSST path below already did this, which is why it returns the
+        # card to idle.) Dropping `model_instance` first releases the tensors
+        # promptly instead of relying on the collector to walk the cycle.
+        sep.model_instance = None
         del sep
         gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         progress(100, "Done")
         return stems
 
@@ -547,6 +585,14 @@ def separate_file(
     extract_instrumental: bool = False,
     progress: Optional[ProgressFn] = None,
 ) -> list[dict[str, Any]]:
+    """Separate `input_path`, writing every produced stem into `output_dir`.
+
+    `extract_instrumental` is accepted for API/back-compat (the web client still
+    sends it for the Vocal Remover and Karaoke scenes) but intentionally has no
+    effect: a job reports exactly the stems the run produced. It used to hide
+    vocal stems, which made a job advertise fewer stems than the download bundle
+    contained — and, for a vocals-target model, produced no output at all.
+    """
     progress = progress or (lambda p, s: None)
     backend = get_backend()
     return backend.separate(

@@ -16,7 +16,7 @@ const INCLUDED = [
   {
     icon: HardDrive,
     title: "Runs on your own machine",
-    body: "Separation happens on your GPU through the local MSST worker. Audio never leaves your computer.",
+    body: "Separation happens on your GPU through the local worker. Audio never leaves your computer.",
   },
   {
     icon: ShieldCheck,

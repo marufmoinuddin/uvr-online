@@ -2,8 +2,8 @@ import type { Model, SceneKey, SceneMeta } from "./types";
 
 /**
  * Model catalog — seeded from verified HF sources (spec §5) plus the
- * models actually installed in the local MSST-WebUI stack. The API worker
- * merges this with the live `models.json` / `models_info.json` at runtime.
+ * checkpoints shipped in `api/models.json`. The worker's live catalog is
+ * merged in at runtime by /api/models.
  */
 const BASE_MODELS: Model[] = [
   // BS-RoFormer family
@@ -135,7 +135,7 @@ const BASE_MODELS: Model[] = [
     stems: ["drums", "bass", "vocals", "other"],
   },
 
-  // Locally installed MSST models (verified in this workspace)
+  // Additional HuggingFace-hosted checkpoints (verified in this workspace)
   {
     id: "mbr_instfv9_gabox",
     name: "Mel-Band RoFormer Inst Fv9 (Gabox)",
@@ -171,14 +171,15 @@ const BASE_MODELS: Model[] = [
   },
   {
     id: "bs_roformer_inst_hyperacev2_ckpt",
+    unsupported:
+      "No download source is configured for this checkpoint, so it cannot be fetched.",
     name: "BS-RoFormer Inst HyperACE v2 (ckpt)",
     arch: "BS-RoFormer",
     target: "instrumental",
-    tags: ["clean", "low-bleed", "installed"],
+    tags: ["clean", "low-bleed"],
     sizeMB: 289,
     source: "pcunwa/BS-Roformer-HyperACE",
     sdr: 12.1,
-    installed: true,
   },
 ];
 

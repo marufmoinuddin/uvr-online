@@ -10,6 +10,7 @@ services:
         NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:8000}
     ports:
       - "3000:3000"
+    restart: unless-stopped
     environment:
       # Server-side proxy target. Inside the compose network the worker is
       # reachable by SERVICE NAME — `localhost` here would resolve to this
@@ -24,6 +25,11 @@ services:
     build: ./api
     ports:
       - "8000:8000"
+    # A GPU process that is killed by the kernel OOM killer cannot be caught
+    # in-process, and it takes the whole API down with it. Restarting brings it
+    # back; jobs.json persistence then marks the interrupted job as an error
+    # instead of silently losing it.
+    restart: unless-stopped
     deploy:
       resources:
         reservations:

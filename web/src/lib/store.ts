@@ -56,12 +56,37 @@ export const useStore = create<Store>()(
             : [...get().favorites, id],
         }),
 
-      addJob: (job) => set({ jobs: [job, ...get().jobs] }),
+      /**
+       * Insert a job optimistically, right after the upload is accepted.
+       *
+       * This must be idempotent. The worker broadcasts the new job over the
+       * WebSocket, and that frame can arrive BEFORE `createJob()`'s promise
+       * resolves, so `upsertJob` has already inserted it — a plain prepend
+       * would then store the job twice (and persist the duplicate).
+       */
+      addJob: (job) =>
+        set((s) =>
+          s.jobs.some((j) => j.id === job.id) ? {} : { jobs: [job, ...s.jobs] },
+        ),
+      /**
+       * Merge a single job from the worker (WebSocket frame or poll).
+       *
+       * Also collapses any pre-existing duplicate of that id, so a store left
+       * with two copies by the older non-idempotent `addJob` heals instead of
+       * rendering the job twice forever (which also made React log "two
+       * children with the same key").
+       */
       upsertJob: (job) =>
-        set({
-          jobs: get().jobs.some((j) => j.id === job.id)
-            ? get().jobs.map((j) => (j.id === job.id ? { ...j, ...job } : j))
-            : [job, ...get().jobs],
+        set((s) => {
+          const seen = new Set<string>();
+          const jobs: Job[] = [];
+          for (const j of s.jobs) {
+            if (seen.has(j.id)) continue;
+            seen.add(j.id);
+            jobs.push(j.id === job.id ? { ...j, ...job } : j);
+          }
+          if (!seen.has(job.id)) jobs.unshift(job);
+          return { jobs };
         }),
       /**
        * Reconcile with the worker's authoritative job list.

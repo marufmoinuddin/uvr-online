@@ -74,7 +74,7 @@ export const LICENSES: Record<LicenseKind, LicenseInfo> = {
  * Anything not listed falls back to the architecture default.
  */
 export const MODEL_LICENSE: Record<string, LicenseKind> = {
-  // Locally installed MSST checkpoints
+  // Locally downloaded and hand-placed checkpoints
   becruily_deux: "CC-BY-NC-4.0",
   mbr_instfv9_gabox: "UNSPECIFIED",
   mbr_instfv9_2_gabox: "UNSPECIFIED",

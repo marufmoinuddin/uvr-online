@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ListMusic, Trash2 } from "lucide-react";
+import { ListMusic, Trash2, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
 import { useJobs } from "@/hooks/useJobs";
@@ -32,6 +32,39 @@ export function ResultsCard({ className }: { className?: string }) {
     () => [...jobs].sort((a, b) => b.createdAt - a.createdAt),
     [jobs],
   );
+
+  /**
+   * Only the newest few jobs mount their stem players.
+   *
+   * Every finished job otherwise renders an <audio> element and a canvas per
+   * stem, so a long history means hundreds of live media elements competing for
+   * decoder resources and slowing the whole page down. Older jobs collapse to
+   * a "Show N stems" button — download, re-run and delete stay available, so
+   * nothing becomes unreachable.
+   */
+  const EXPANDED_LIMIT = 6;
+  const [manuallyExpanded, setManuallyExpanded] = React.useState<Set<string>>(
+    new Set(),
+  );
+  const toggleJob = React.useCallback((id: string) => {
+    setManuallyExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const isStemsVisible = React.useCallback(
+    (index: number, jobId: string) =>
+      index < EXPANDED_LIMIT || manuallyExpanded.has(jobId),
+    [manuallyExpanded],
+  );
+
+  const collapsedCount = sorted.filter(
+    (job, i) =>
+      job.status === "ready" && !isStemsVisible(i, job.id),
+  ).length;
 
   // Track status transitions for screen-reader announcements.
   const prevStatusRef = React.useRef<Map<string, string>>(new Map());
@@ -126,10 +159,35 @@ export function ResultsCard({ className }: { className?: string }) {
             {liveMessage}
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
-            {sorted.map((job) => (
-              <JobCard key={job.id} job={job} />
+            {sorted.map((job, i) => (
+              <JobCard
+                key={job.id}
+                job={job}
+                stemsCollapsed={!isStemsVisible(i, job.id)}
+                onToggleStems={() => toggleJob(job.id)}
+              />
             ))}
           </div>
+          {collapsedCount > 0 && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              <button
+                type="button"
+                onClick={() =>
+                  setManuallyExpanded(
+                    new Set(
+                      sorted
+                        .filter((job) => job.status === "ready")
+                        .map((job) => job.id),
+                    ),
+                  )
+                }
+                className="inline-flex items-center gap-1 font-medium text-foreground underline-offset-4 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+                Expand {collapsedCount} older result{collapsedCount === 1 ? "" : "s"}
+              </button>
+            </p>
+          )}
         </>
       )}
     </section>

@@ -9,11 +9,13 @@ import {
   Music,
   SlidersHorizontal,
   Layers,
+  Target,
   Wrench,
   AudioLines,
   ChevronsUpDown,
   AudioWaveform,
   Grid2X2,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -49,13 +51,14 @@ const GROUPS: NavGroup[] = [
     label: "Separation",
     items: [
       { key: "stem-splitter", label: "Stem Splitter", href: "/tools/stem-splitter", icon: Layers },
+      { key: "instrument-extractor", label: "Instrument Extractor", href: "/tools/instrument-extractor", icon: Target },
       { key: "extract-vocals", label: "Extract Vocals", href: "/tools/extract-vocals", icon: MicVocal },
     ],
   },
   {
     label: "Repair",
     items: [
-      { key: "denoise", label: "Noise Removal", href: "/tools/denoise", icon: Wrench },
+      { key: "audio-repair", label: "Audio Repair", href: "/tools/audio-repair", icon: Wrench },
     ],
   },
   {
@@ -63,6 +66,14 @@ const GROUPS: NavGroup[] = [
     items: [
       { key: "production", label: "Music Production Tools", href: "/tools/production", icon: AudioLines },
       { key: "model-picker", label: "Model Picker", href: "/tools/model-picker", icon: Grid2X2 },
+    ],
+  },
+  {
+    // "history" is a real route, not a scene — it has no models and renders no
+    // workbench. Kept in the same list so the sidebar stays one navigation.
+    label: "History",
+    items: [
+      { key: "history", label: "Recent Jobs", href: "/tools/history", icon: History },
     ],
   },
 ];

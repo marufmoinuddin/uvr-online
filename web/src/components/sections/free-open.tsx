@@ -31,7 +31,7 @@ const INCLUDED = [
 ];
 
 const INCLUDED_FEATURES = [
-  "All 9 tools — vocal remover, karaoke, 4-stem, denoise, acapella…",
+  "All 9 tools — vocal remover, karaoke, 4-stem, audio repair, acapella…",
   "Every model in the catalog, with no gating",
   "Ensemble engine (2–6 model fusion, 6 modes)",
   "Lossless WAV / FLAC / MP3 320 export",

@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 import time
 
 import yaml
@@ -25,7 +26,7 @@ from typing import Any, Callable, Optional
 
 import numpy as np
 
-from model_manager import manager
+from model_manager import manager, resolve_registry_dir as _resolve_registry_dir
 
 logger = logging.getLogger("uvr.inference")
 
@@ -43,6 +44,77 @@ if _registry_dir:
         logging.getLogger("uvr.inference").warning(
             "Could not create AUDIO_SEPARATOR_MODEL_DIR %s: %s", _registry_dir, exc
         )
+
+
+
+def _patch_melband_mlp_expansion() -> bool:
+    """Forward `mlp_expansion_factor` into audio-separator's MelBand mask estimator.
+
+    audio-separator (verified on 0.47.0) drops this parameter on the MelBand
+    path only. The chain is:
+
+      * `roformer_loader._create_mel_band_roformer` **does** pass
+        `mlp_expansion_factor` (default 4) into `MelBandRoformer`
+      * `MelBandRoformer.__init__` accepts and stores it
+      * `mel_band_roformer.py:331` then builds
+        `MaskEstimator(dim=..., dim_inputs=..., depth=mask_estimator_depth)`
+        **without forwarding it**, so `MaskEstimator` falls back to its own
+        default of 4
+
+    The sibling `bs_roformer.py:423` *does* forward it, which is why
+    BS-RoFormer checkpoints trained with factor 1 load and MelBand ones do not.
+
+    Measured on `melband_roformer_guitar_becruily.ckpt` (author config says
+    `mlp_expansion_factor: 1`): checkpoint mask-MLP hidden = 256, built = 1024
+    (= 256 x 4), and `load_state_dict(strict=True)` raises `size mismatch`.
+    With this patch the strict load passes with 0 missing / 0 unexpected /
+    0 mismatched keys.
+
+    Patched at runtime rather than by editing site-packages, which a `uv sync`
+    would silently revert. Inference is serial (one job at a time), so the
+    module-level hand-off is not racy.
+
+    Returns True if the patch is active.
+    """
+    try:
+        from audio_separator.separator.uvr_lib_v5.roformer import (
+            mel_band_roformer as mbr,
+        )
+    except Exception as exc:  # pragma: no cover - dependency layout change
+        logger.debug("MelBand mlp_expansion_factor patch unavailable: %s", exc)
+        return False
+
+    if getattr(mbr, "_uvr_mlp_forwarding", False):
+        return True
+
+    original_mask_init = mbr.MaskEstimator.__init__
+    original_model_init = mbr.MelBandRoformer.__init__
+
+    def mask_init(self, dim, dim_inputs, depth, mlp_expansion_factor=4):
+        forced = getattr(mbr, "_uvr_mlp_expansion_factor", None)
+        if forced is not None:
+            mlp_expansion_factor = forced
+        original_mask_init(self, dim, dim_inputs, depth, mlp_expansion_factor)
+
+    def model_init(self, *args, **kwargs):
+        mbr._uvr_mlp_expansion_factor = kwargs.get("mlp_expansion_factor")
+        try:
+            original_model_init(self, *args, **kwargs)
+        finally:
+            mbr._uvr_mlp_expansion_factor = None
+
+    mbr.MaskEstimator.__init__ = mask_init
+    mbr.MelBandRoformer.__init__ = model_init
+    mbr._uvr_mlp_forwarding = True
+    logger.info("Patched MelBand mask-estimator mlp_expansion_factor forwarding")
+    return True
+
+
+# The resolver lives in model_manager so install-state reporting and the
+# loader always agree on where the registry cache lives; re-exported here
+# because call sites (and scripts/probe-registry-model.py) import it from
+# this module.
+resolve_registry_dir = _resolve_registry_dir
 
 ProgressFn = Callable[[float, str], None]
 
@@ -103,6 +175,84 @@ def _ensure_config_aliases(model_dir: Path) -> None:
             shutil.copyfile(src, alias)
         except OSError as exc:  # pragma: no cover
             logger.debug("Could not alias %s -> %s: %s", src, alias, exc)
+
+
+# Stem names reach us from two different places and disagree on spelling: the
+# vendored MSST path writes whatever the model config calls an instrument
+# ("vocals", "instrument"), while audio-separator writes the parenthesised part
+# of its output filename ("Vocals", "Instrumental"). The UI then shows two
+# spellings of the same stem depending on which backend ran.
+#
+# Canonicalising at this boundary means the rest of the app only ever sees one
+# spelling, and a model config that names an instrument differently cannot leak
+# an odd label into the player or the download filename.
+_STEM_SYNONYMS = {
+    "vocal": "Vocals",
+    "vocals": "Vocals",
+    "lead_vocals": "Vocals",
+    "lead vocals": "Vocals",
+    "backing_vocals": "Vocals",
+    "backing vocals": "Vocals",
+    "bvocals": "Vocals",
+    "vocalmain": "Vocals",
+    "instrument": "Instrumental",
+    "instrumental": "Instrumental",
+    "accompaniment": "Instrumental",
+    "no_vocals": "Instrumental",
+    "other": "Other",
+    "others": "Other",
+    "drum": "Drums",
+    "drums": "Drums",
+    "bass": "Bass",
+    "bassline": "Bass",
+    # Drum-family stems written by MDX DrumSep. The author abbreviates the
+    # hi-hat, so normalise it to the same label the Instrument Extractor offers.
+    "hh": "Hi-Hat",
+    "hihat": "Hi-Hat",
+    "hi_hat": "Hi-Hat",
+    "hi-hat": "Hi-Hat",
+    "kick": "Kick",
+    "snare": "Snare",
+    "toms": "Toms",
+    "tom": "Toms",
+    "ride": "Ride",
+    "crash": "Crash",
+}
+
+
+def canonical_stem_name(raw: str) -> str:
+    """Normalise a stem label to a single, consistent spelling.
+
+    Unknown names are title-cased rather than dropped, so a new architecture
+    still produces a readable label instead of an empty one.
+    """
+    name = (raw or "").strip()
+    if not name:
+        return "Stem"
+    key = name.lower().replace("-", "_")
+    if key in _STEM_SYNONYMS:
+        return _STEM_SYNONYMS[key]
+    spaced = name.replace("_", " ").strip()
+    return spaced[:1].upper() + spaced[1:] if spaced else "Stem"
+
+
+def finalise_stems(stems: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Canonicalise stem names and guarantee they are unique within a job.
+
+    Two backends can canonicalise different sources onto the same label (e.g. a
+    config naming both "instrument" and "Instrumental"). Duplicate names would
+    break React keys in the player and collide in a download bundle, so a
+    counter suffix is added.
+    """
+    seen: dict[str, int] = {}
+    out: list[dict[str, Any]] = []
+    for stem in stems:
+        base = canonical_stem_name(stem.get("name", ""))
+        n = seen.get(base, 0) + 1
+        seen[base] = n
+        name = base if n == 1 else f"{base} {n}"
+        out.append({**stem, "name": name})
+    return out
 
 
 def _local_model_type(arch: Optional[str]) -> str:
@@ -319,7 +469,7 @@ def _separate_with_msst(
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     progress(100, "Done")
-    return stems
+    return finalise_stems(stems)
 
 
 class _AudioSeparatorBackend:
@@ -440,14 +590,14 @@ class _AudioSeparatorBackend:
             # itself. Otherwise treat the id as a registry filename directly.
             #
             # The registry cache defaults to /tmp, which is wiped on restart,
-            # so point it at the mounted volume to keep downloads around. This
-            # is passed per-call rather than via AUDIO_SEPARATOR_MODEL_DIR,
-            # because that env var overrides model_file_dir globally and would
-            # clobber the local-store path above.
-            registry_dir = Path(
-                os.environ.get("MODEL_STORE", "./models")
-            ) / ".registry"
-            registry_dir.mkdir(parents=True, exist_ok=True)
+            # so point it at a persistent location. Resolved through
+            # resolve_registry_dir() because <MODEL_STORE>/.registry can be
+            # left root-owned by an earlier Docker run, which made every
+            # registry-backed model fail locally with "Permission denied".
+            # This is passed per-call rather than via
+            # AUDIO_SEPARATOR_MODEL_DIR, because that env var overrides
+            # model_file_dir globally and would clobber the local-store path.
+            registry_dir = resolve_registry_dir()
             registry_name = getattr(rec, "registry", None) or model_id
             sep = self._cls(model_file_dir=str(registry_dir), **sep_kwargs)
             sep.load_model(model_filename=registry_name)
@@ -481,10 +631,21 @@ class _AudioSeparatorBackend:
             )
             progress(10 + int((i + 1) / total * 85), f"Saved {stem}")
 
+        # Release the checkpoint and return its VRAM. Without this the next job
+        # starts with ~1.2 GB still held, needs more than the card has left, and
+        # dies with a native SIGSEGV that takes the whole worker down.
+        #
+        # torch is imported function-locally throughout this module, so it is
+        # NOT in scope here — importing it locally is required, not stylistic.
+        import torch
+
+        sep.model_instance = None
         del sep
         gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         progress(100, "Done")
-        return stems
+        return finalise_stems(stems)
 
 
 _backend: Optional[Any] = None
@@ -538,6 +699,41 @@ def list_models() -> list[dict[str, Any]]:
     return merged
 
 
+def select_instrument(
+    stems: list[dict[str, Any]], target: str, model_id: str
+) -> list[dict[str, Any]]:
+    """Reduce a full stem set to just the requested instrument.
+
+    Returns a ONE-ELEMENT list so every consumer (player, bundle, history) keeps
+    working exactly as it does for a repair job.
+
+    Raises rather than substituting anything: silently returning `Other` or the
+    first output would hand the user a file of the wrong sound while reporting
+    success — the exact failure mode this project exists to eliminate.
+    """
+    # Canonicalise BOTH sides rather than comparing raw strings. The stem a
+    # model writes and the label a user picks often differ in more than case —
+    # MDX DrumSep writes "hh" while the picker offers "Hi-Hat" — and
+    # `_STEM_SYNONYMS` already folds those together.
+    if not (target or "").strip():
+        return stems
+    want = canonical_stem_name(target).lower()
+
+    # Compare through the canonical names so "guitar" matches "Guitar" and a
+    # model's own spelling (e.g. "piano") is not required.
+    for stem in stems:
+        name = canonical_stem_name(stem.get("name", ""))
+        if name.lower() == want:
+            return [{**stem, "name": name}]
+
+    available = ", ".join(sorted({canonical_stem_name(s.get("name", "")) for s in stems}))
+    raise ValueError(
+        f"Model '{model_id}' did not produce a '{target}' stem. "
+        f"Available: {available or 'none'}. "
+        "Pick a model that separates that instrument, or choose another target."
+    )
+
+
 def separate_file(
     model_id: str,
     input_path: str,
@@ -546,10 +742,14 @@ def separate_file(
     use_tta: bool = False,
     extract_instrumental: bool = False,
     progress: Optional[ProgressFn] = None,
+    extract_target: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     progress = progress or (lambda p, s: None)
+    # Apply before any model is constructed. Idempotent, and harmless for
+    # checkpoints that were trained with the default factor of 4.
+    _patch_melband_mlp_expansion()
     backend = get_backend()
-    return backend.separate(
+    stems = backend.separate(
         model_id,
         input_path,
         output_dir,
@@ -558,3 +758,7 @@ def separate_file(
         extract_instrumental,
         progress,
     )
+    if extract_target:
+        stems = select_instrument(stems, extract_target, model_id)
+        progress(95, f"Selected {canonical_stem_name(stems[0]['name'])}")
+    return stems

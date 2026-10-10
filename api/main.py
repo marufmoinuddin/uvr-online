@@ -51,6 +51,7 @@ from fastapi.responses import (
 from backend import list_models
 from job_queue import OUTPUT_ROOT, UPLOAD_ROOT, Job, queue
 from model_manager import manager as model_manager
+import repair
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("uvr.main")
@@ -78,6 +79,42 @@ ALLOWED_EXT = {
     ".mp4", ".mov", ".mkv", ".webm",
 }
 
+# Scenes that run the repair pipeline instead of a separation model. Must stay
+# in sync with the frontend scene keys in web/src/lib/models.ts.
+REPAIR_SCENES = {"audio-repair"}
+# Repair jobs carry no model, but the field is required and "Re-run" re-submits
+# it, so a sentinel is stored rather than making the column nullable.
+REPAIR_MODEL_ID = "__repair__"
+
+
+# Instruments that can be isolated, mapped to the labels shown in the UI.
+# The catalogue's per-model `instrumentTargets` must name only instruments the
+# model actually emits — observed from a real run, never inferred from a filename.
+INSTRUMENT_TARGETS = {
+    "drums": "Drums",
+    "bass": "Bass",
+    "guitar": "Guitar",
+    "piano": "Piano",
+    "vocals": "Vocals",
+    "other": "Other",
+    # Drum-family stems. The reference site offers dedicated models for these;
+    # ours come from one MDX DrumSep checkpoint that was observed emitting all
+    # six. Names here are OUR keys — the worker matches them against the
+    # canonical stem name, so they must line up with what that model writes.
+    "kick": "Kick",
+    "snare": "Snare",
+    "toms": "Toms",
+    "hihat": "Hi-Hat",
+    "ride": "Ride",
+    "crash": "Crash",
+}
+
+# Maps an INSTRUMENT_TARGETS key to the stem filename the model actually
+# writes. Only needed where they differ — "hihat" is written as "hh".
+STEM_NAME_FOR_TARGET = {
+    "hihat": "hh",
+}
+
 
 @app.on_event("startup")
 async def startup() -> None:
@@ -88,6 +125,29 @@ async def startup() -> None:
 @app.on_event("shutdown")
 async def shutdown() -> None:
     await queue.stop()
+
+
+@api.get("/instruments")
+async def instruments() -> dict:
+    """Instruments the catalogue can isolate, from the models' own metadata.
+
+    Derived rather than hard-coded so the list cannot offer something no model
+    in the scene actually produces.
+    """
+    models = model_manager.all()
+    available: dict[str, list[str]] = {}
+    for m in models:
+        if m.unsupported:
+            continue
+        for t in (m.instrument_targets or []):
+            available.setdefault(t, []).append(m.id)
+    return {
+        "targets": [
+            {"key": k, "label": INSTRUMENT_TARGETS.get(k, k.title()),
+             "models": sorted(v)}
+            for k, v in sorted(available.items())
+        ]
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -110,6 +170,21 @@ async def health() -> dict:
         "queueDepth": queue.queue_depth(),
         "device": f"cuda:{torch.cuda.current_device()}" if gpu else "cpu",
     }
+
+
+# ---------------------------------------------------------------------------
+# Repair
+# ---------------------------------------------------------------------------
+
+@api.get("/repair/ops")
+async def repair_ops() -> dict:
+    """Repairs the worker can apply.
+
+    Served from the worker rather than duplicated in the frontend so the two
+    cannot drift: a filter chain that ffmpeg rejects would otherwise only fail
+    after the user uploaded a file and waited for a job.
+    """
+    return {"ops": repair.list_ops(), "formats": sorted(repair.SUPPORTED_FORMATS)}
 
 
 # ---------------------------------------------------------------------------
@@ -226,15 +301,54 @@ async def create_job(
     if not isinstance(opts, dict):
         raise HTTPException(400, "'options' must be a JSON object")
 
-    # Reject a model that cannot possibly run BEFORE writing the upload to disk.
-    # Previously an unknown or unsupported id was accepted, and the failure only
-    # surfaced later as a confusing error on a job the user had to wait for
-    # ("Permission denied", or "cannot be used with this backend").
-    rec = model_manager.get(model_id)
-    if rec is None:
-        raise HTTPException(400, f"Unknown model '{model_id}'")
-    if rec.unsupported:
-        raise HTTPException(400, f"'{rec.name}' cannot be used: {rec.unsupported}")
+    # Repair is a separate pipeline (ffmpeg DSP, not a model). It is selected
+    # by the scene rather than a flag so the client cannot ask for one while
+    # sending the other's parameters.
+    kind = "repair" if scene in REPAIR_SCENES else "separate"
+
+    if kind == "repair":
+        # Validate the requested repairs up front. Silently dropping an unknown
+        # op would return a file that still has the defect the user was trying
+        # to remove.
+        try:
+            repair_ops = repair.resolve_ops(opts.get("repairOps"))
+        except repair.RepairError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        opts["repairOps"] = repair_ops
+        # A repair has no model, but the column is NOT NULL in the job record
+        # and "Re-run" re-submits with it.
+        model_id = REPAIR_MODEL_ID
+    else:
+        # Reject a model that cannot possibly run BEFORE writing the upload to
+        # disk. Previously an unknown or unsupported id was accepted, and the
+        # failure only surfaced later as a confusing error on a job the user had
+        # to wait for ("Permission denied", or "cannot be used with this
+        # backend").
+        rec = model_manager.get(model_id)
+        if rec is None:
+            raise HTTPException(400, f"Unknown model '{model_id}'")
+        if rec.unsupported:
+            raise HTTPException(400, f"'{rec.name}' cannot be used: {rec.unsupported}")
+
+        # Validate the instrument target against the model's OWN metadata before
+        # inference. Checking here rather than after separation means the user is
+        # told immediately, not after a full model run that then fails.
+        target = opts.get("extractTarget")
+        if target:
+            key = str(target).strip().lower()
+            if key not in INSTRUMENT_TARGETS:
+                raise HTTPException(
+                    400,
+                    f"Unknown instrument '{target}'. "
+                    f"Choose one of: {', '.join(sorted(INSTRUMENT_TARGETS))}",
+                )
+            if key not in (rec.instrument_targets or []):
+                supported = ", ".join(rec.instrument_targets or []) or "none"
+                raise HTTPException(
+                    400,
+                    f"'{rec.name}' cannot isolate {INSTRUMENT_TARGETS[key]}. "
+                    f"It can: {supported}.",
+                )
 
     # Keep the upload on the mounted output volume rather than /tmp: /tmp is
     # wiped when the container restarts, which would break "Re-run" for every
@@ -262,7 +376,9 @@ async def create_job(
         shutil.rmtree(tmp, ignore_errors=True)
         raise
 
-    job = await queue.create(scene, model_id, safe_name, opts, str(dest))
+    job = await queue.create(
+        scene, model_id, safe_name, opts, str(dest), kind=kind
+    )
     return {"jobId": job.id, "status": job.status, "etaSec": job.eta_sec or 30}
 
 
@@ -303,13 +419,20 @@ async def reuse_job(job_id: str, payload: dict) -> dict:
     if not job.input_path or not Path(job.input_path).exists():
         raise HTTPException(410, "Original upload no longer available")
 
-    model_id = payload.get("modelId") or job.model_id
+    kind = job.kind or "separate"
+    # A repair has no model, so re-running must reuse its ops and keep it on
+    # the repair pipeline — otherwise it would be queued as a separation with
+    # the "__repair__" sentinel and fail on an unknown model.
+    model_id = job.model_id if kind == "repair" else (
+        payload.get("modelId") or job.model_id
+    )
     new_job = await queue.create(
         job.scene,
         model_id,
         job.file_name,
         job.options,
         job.input_path,
+        kind=kind,
     )
     return {"jobId": new_job.id, "status": new_job.status, "etaSec": new_job.eta_sec or 30}
 

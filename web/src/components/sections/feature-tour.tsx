@@ -7,6 +7,7 @@ import {
   Mic,
   Music,
   Layers,
+  Target,
   Waves,
   MicVocal,
   SlidersHorizontal,
@@ -22,6 +23,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   mic: Mic,
   music: Music,
   layers: Layers,
+          target: Target,
   waves: Waves,
   "mic-vocal": MicVocal,
   "sliders-horizontal": SlidersHorizontal,
@@ -37,7 +39,7 @@ export function FeatureTour({ className }: { className?: string }) {
           Every tool, one click away
         </h2>
         <p className="mt-3 text-muted-foreground">
-          Nine professional separation tools backed by 80+ open-source models.
+          Ten professional separation tools backed by 80+ open-source models.
         </p>
       </div>
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

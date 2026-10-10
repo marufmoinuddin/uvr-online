@@ -1,0 +1,859 @@
+{
+ "source": "audio_separator.separator.Separator.get_simplified_model_list()",
+ "audio_separator_version": "unknown",
+ "count": 169,
+ "families": {
+  "roformer": 89,
+  "uvr": 52,
+  "other": 19,
+  "mdx": 5,
+  "demucs": 4
+ },
+ "models": {
+  "10_SP-UVR-2B-32000-1.pth": {
+   "type": "",
+   "name": "10_SP-UVR-2B-32000-1.pth",
+   "is_uvr_vip": false
+  },
+  "11_SP-UVR-2B-32000-2.pth": {
+   "type": "",
+   "name": "11_SP-UVR-2B-32000-2.pth",
+   "is_uvr_vip": false
+  },
+  "12_SP-UVR-3B-44100.pth": {
+   "type": "",
+   "name": "12_SP-UVR-3B-44100.pth",
+   "is_uvr_vip": false
+  },
+  "13_SP-UVR-4B-44100-1.pth": {
+   "type": "",
+   "name": "13_SP-UVR-4B-44100-1.pth",
+   "is_uvr_vip": false
+  },
+  "14_SP-UVR-4B-44100-2.pth": {
+   "type": "",
+   "name": "14_SP-UVR-4B-44100-2.pth",
+   "is_uvr_vip": false
+  },
+  "15_SP-UVR-MID-44100-1.pth": {
+   "type": "",
+   "name": "15_SP-UVR-MID-44100-1.pth",
+   "is_uvr_vip": false
+  },
+  "16_SP-UVR-MID-44100-2.pth": {
+   "type": "",
+   "name": "16_SP-UVR-MID-44100-2.pth",
+   "is_uvr_vip": false
+  },
+  "17_HP-Wind_Inst-UVR.pth": {
+   "type": "",
+   "name": "17_HP-Wind_Inst-UVR.pth",
+   "is_uvr_vip": false
+  },
+  "1_HP-UVR.pth": {
+   "type": "",
+   "name": "1_HP-UVR.pth",
+   "is_uvr_vip": false
+  },
+  "2_HP-UVR.pth": {
+   "type": "",
+   "name": "2_HP-UVR.pth",
+   "is_uvr_vip": false
+  },
+  "3_HP-Vocal-UVR.pth": {
+   "type": "",
+   "name": "3_HP-Vocal-UVR.pth",
+   "is_uvr_vip": false
+  },
+  "4_HP-Vocal-UVR.pth": {
+   "type": "",
+   "name": "4_HP-Vocal-UVR.pth",
+   "is_uvr_vip": false
+  },
+  "5_HP-Karaoke-UVR.pth": {
+   "type": "",
+   "name": "5_HP-Karaoke-UVR.pth",
+   "is_uvr_vip": false
+  },
+  "6_HP-Karaoke-UVR.pth": {
+   "type": "",
+   "name": "6_HP-Karaoke-UVR.pth",
+   "is_uvr_vip": false
+  },
+  "7_HP2-UVR.pth": {
+   "type": "",
+   "name": "7_HP2-UVR.pth",
+   "is_uvr_vip": false
+  },
+  "8_HP2-UVR.pth": {
+   "type": "",
+   "name": "8_HP2-UVR.pth",
+   "is_uvr_vip": false
+  },
+  "9_HP2-UVR.pth": {
+   "type": "",
+   "name": "9_HP2-UVR.pth",
+   "is_uvr_vip": false
+  },
+  "aspiration_mel_band_roformer_less_aggr_sdr_18.1201.ckpt": {
+   "type": "",
+   "name": "aspiration_mel_band_roformer_less_aggr_sdr_18.1201.ckpt",
+   "is_uvr_vip": false
+  },
+  "aspiration_mel_band_roformer_sdr_18.9845.ckpt": {
+   "type": "",
+   "name": "aspiration_mel_band_roformer_sdr_18.9845.ckpt",
+   "is_uvr_vip": false
+  },
+  "BS-Roformer-SW.ckpt": {
+   "type": "",
+   "name": "BS-Roformer-SW.ckpt",
+   "is_uvr_vip": false
+  },
+  "bs_roformer_instrumental_resurrection_gabox.ckpt": {
+   "type": "",
+   "name": "bs_roformer_instrumental_resurrection_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "bs_roformer_instrumental_resurrection_unwa.ckpt": {
+   "type": "",
+   "name": "bs_roformer_instrumental_resurrection_unwa.ckpt",
+   "is_uvr_vip": false
+  },
+  "bs_roformer_karaoke_anvuew.ckpt": {
+   "type": "",
+   "name": "bs_roformer_karaoke_anvuew.ckpt",
+   "is_uvr_vip": false
+  },
+  "bs_roformer_karaoke_frazer_becruily.ckpt": {
+   "type": "",
+   "name": "bs_roformer_karaoke_frazer_becruily.ckpt",
+   "is_uvr_vip": false
+  },
+  "bs_roformer_male_female_by_aufr33_sdr_7.2889.ckpt": {
+   "type": "",
+   "name": "bs_roformer_male_female_by_aufr33_sdr_7.2889.ckpt",
+   "is_uvr_vip": false
+  },
+  "bs_roformer_vocals_gabox.ckpt": {
+   "type": "",
+   "name": "bs_roformer_vocals_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "bs_roformer_vocals_resurrection_unwa.ckpt": {
+   "type": "",
+   "name": "bs_roformer_vocals_resurrection_unwa.ckpt",
+   "is_uvr_vip": false
+  },
+  "bs_roformer_vocals_revive_unwa.ckpt": {
+   "type": "",
+   "name": "bs_roformer_vocals_revive_unwa.ckpt",
+   "is_uvr_vip": false
+  },
+  "bs_roformer_vocals_revive_v2_unwa.ckpt": {
+   "type": "",
+   "name": "bs_roformer_vocals_revive_v2_unwa.ckpt",
+   "is_uvr_vip": false
+  },
+  "bs_roformer_vocals_revive_v3e_unwa.ckpt": {
+   "type": "",
+   "name": "bs_roformer_vocals_revive_v3e_unwa.ckpt",
+   "is_uvr_vip": false
+  },
+  "denoise_mel_band_roformer_aufr33_aggr_sdr_27.9768.ckpt": {
+   "type": "",
+   "name": "denoise_mel_band_roformer_aufr33_aggr_sdr_27.9768.ckpt",
+   "is_uvr_vip": false
+  },
+  "denoise_mel_band_roformer_aufr33_sdr_27.9959.ckpt": {
+   "type": "",
+   "name": "denoise_mel_band_roformer_aufr33_sdr_27.9959.ckpt",
+   "is_uvr_vip": false
+  },
+  "dereverb-echo_mel_band_roformer_sdr_10.0169.ckpt": {
+   "type": "",
+   "name": "dereverb-echo_mel_band_roformer_sdr_10.0169.ckpt",
+   "is_uvr_vip": false
+  },
+  "dereverb-echo_mel_band_roformer_sdr_13.4843_v2.ckpt": {
+   "type": "",
+   "name": "dereverb-echo_mel_band_roformer_sdr_13.4843_v2.ckpt",
+   "is_uvr_vip": false
+  },
+  "dereverb_big_mbr_ep_362.ckpt": {
+   "type": "",
+   "name": "dereverb_big_mbr_ep_362.ckpt",
+   "is_uvr_vip": false
+  },
+  "dereverb_echo_mbr_fused.ckpt": {
+   "type": "",
+   "name": "dereverb_echo_mbr_fused.ckpt",
+   "is_uvr_vip": false
+  },
+  "dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt": {
+   "type": "",
+   "name": "dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
+   "is_uvr_vip": false
+  },
+  "dereverb_mel_band_roformer_less_aggressive_anvuew_sdr_18.8050.ckpt": {
+   "type": "",
+   "name": "dereverb_mel_band_roformer_less_aggressive_anvuew_sdr_18.8050.ckpt",
+   "is_uvr_vip": false
+  },
+  "dereverb_mel_band_roformer_mono_anvuew.ckpt": {
+   "type": "",
+   "name": "dereverb_mel_band_roformer_mono_anvuew.ckpt",
+   "is_uvr_vip": false
+  },
+  "dereverb_super_big_mbr_ep_346.ckpt": {
+   "type": "",
+   "name": "dereverb_super_big_mbr_ep_346.ckpt",
+   "is_uvr_vip": false
+  },
+  "deverb_bs_roformer_8_384dim_10depth.ckpt": {
+   "type": "",
+   "name": "deverb_bs_roformer_8_384dim_10depth.ckpt",
+   "is_uvr_vip": false
+  },
+  "hdemucs_mmi.yaml": {
+   "type": "",
+   "name": "hdemucs_mmi.yaml",
+   "is_uvr_vip": false
+  },
+  "htdemucs.yaml": {
+   "type": "",
+   "name": "htdemucs.yaml",
+   "is_uvr_vip": false
+  },
+  "htdemucs_6s.yaml": {
+   "type": "",
+   "name": "htdemucs_6s.yaml",
+   "is_uvr_vip": false
+  },
+  "htdemucs_ft.yaml": {
+   "type": "",
+   "name": "htdemucs_ft.yaml",
+   "is_uvr_vip": false
+  },
+  "Kim_Inst.onnx": {
+   "type": "",
+   "name": "Kim_Inst.onnx",
+   "is_uvr_vip": false
+  },
+  "Kim_Vocal_1.onnx": {
+   "type": "",
+   "name": "Kim_Vocal_1.onnx",
+   "is_uvr_vip": false
+  },
+  "Kim_Vocal_2.onnx": {
+   "type": "",
+   "name": "Kim_Vocal_2.onnx",
+   "is_uvr_vip": false
+  },
+  "kuielab_a_bass.onnx": {
+   "type": "",
+   "name": "kuielab_a_bass.onnx",
+   "is_uvr_vip": false
+  },
+  "kuielab_a_drums.onnx": {
+   "type": "",
+   "name": "kuielab_a_drums.onnx",
+   "is_uvr_vip": false
+  },
+  "kuielab_a_other.onnx": {
+   "type": "",
+   "name": "kuielab_a_other.onnx",
+   "is_uvr_vip": false
+  },
+  "kuielab_a_vocals.onnx": {
+   "type": "",
+   "name": "kuielab_a_vocals.onnx",
+   "is_uvr_vip": false
+  },
+  "kuielab_b_bass.onnx": {
+   "type": "",
+   "name": "kuielab_b_bass.onnx",
+   "is_uvr_vip": false
+  },
+  "kuielab_b_drums.onnx": {
+   "type": "",
+   "name": "kuielab_b_drums.onnx",
+   "is_uvr_vip": false
+  },
+  "kuielab_b_other.onnx": {
+   "type": "",
+   "name": "kuielab_b_other.onnx",
+   "is_uvr_vip": false
+  },
+  "kuielab_b_vocals.onnx": {
+   "type": "",
+   "name": "kuielab_b_vocals.onnx",
+   "is_uvr_vip": false
+  },
+  "MDX23C-8KFFT-InstVoc_HQ.ckpt": {
+   "type": "",
+   "name": "MDX23C-8KFFT-InstVoc_HQ.ckpt",
+   "is_uvr_vip": false
+  },
+  "MDX23C-8KFFT-InstVoc_HQ_2.ckpt": {
+   "type": "",
+   "name": "MDX23C-8KFFT-InstVoc_HQ_2.ckpt",
+   "is_uvr_vip": false
+  },
+  "MDX23C-De-Reverb-aufr33-jarredou.ckpt": {
+   "type": "",
+   "name": "MDX23C-De-Reverb-aufr33-jarredou.ckpt",
+   "is_uvr_vip": false
+  },
+  "MDX23C-DrumSep-aufr33-jarredou.ckpt": {
+   "type": "",
+   "name": "MDX23C-DrumSep-aufr33-jarredou.ckpt",
+   "is_uvr_vip": false
+  },
+  "MDX23C_D1581.ckpt": {
+   "type": "",
+   "name": "MDX23C_D1581.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_bleed_suppressor_v1.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_bleed_suppressor_v1.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_crowd_aufr33_viperx_sdr_8.7144.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_crowd_aufr33_viperx_sdr_8.7144.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_denoise_debleed_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_denoise_debleed_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_2_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_2_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_3_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_3_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_becruily.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_becruily.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_bleedless_v1_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_bleedless_v1_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_bleedless_v2_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_bleedless_v2_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_bleedless_v3_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_bleedless_v3_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_fullness_noise_v4_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_fullness_noise_v4_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_fullness_v1_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_fullness_v1_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_fullness_v2_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_fullness_v2_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_fullness_v3_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_fullness_v3_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_fullness_v4_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_fullness_v4_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_fv7z_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_fv7z_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_fv8_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_fv8_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_fv8b_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_fv8b_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_fvx_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_fvx_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_instv5_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_instv5_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_instv5n_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_instv5n_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_instv6_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_instv6_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_instv6n_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_instv6n_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_instv7_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_instv7_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_instv7n_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_instv7n_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_instv8_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_instv8_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_instrumental_instv8n_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_instrumental_instv8n_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_karaoke_becruily.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_karaoke_becruily.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_karaoke_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_karaoke_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_karaoke_gabox_v2.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_karaoke_gabox_v2.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_kim_ft2_bleedless_unwa.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_kim_ft2_bleedless_unwa.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_kim_ft2_unwa.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_kim_ft2_unwa.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_kim_ft3_unwa.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_kim_ft3_unwa.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_kim_ft_unwa.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_kim_ft_unwa.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_vocal_fullness_aname.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_vocal_fullness_aname.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_vocals_becruily.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_vocals_becruily.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_vocals_fv1_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_vocals_fv1_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_vocals_fv2_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_vocals_fv2_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_vocals_fv3_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_vocals_fv3_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_vocals_fv4_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_vocals_fv4_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_vocals_fv5_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_vocals_fv5_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_vocals_fv6_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_vocals_fv6_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_vocals_fv7b_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_vocals_fv7b_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_vocals_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_vocals_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "mel_band_roformer_vocals_v2_gabox.ckpt": {
+   "type": "",
+   "name": "mel_band_roformer_vocals_v2_gabox.ckpt",
+   "is_uvr_vip": false
+  },
+  "melband_roformer_big_beta4.ckpt": {
+   "type": "",
+   "name": "melband_roformer_big_beta4.ckpt",
+   "is_uvr_vip": false
+  },
+  "melband_roformer_big_beta5e.ckpt": {
+   "type": "",
+   "name": "melband_roformer_big_beta5e.ckpt",
+   "is_uvr_vip": false
+  },
+  "melband_roformer_big_beta6.ckpt": {
+   "type": "",
+   "name": "melband_roformer_big_beta6.ckpt",
+   "is_uvr_vip": false
+  },
+  "melband_roformer_big_beta6x.ckpt": {
+   "type": "",
+   "name": "melband_roformer_big_beta6x.ckpt",
+   "is_uvr_vip": false
+  },
+  "melband_roformer_inst_v1.ckpt": {
+   "type": "",
+   "name": "melband_roformer_inst_v1.ckpt",
+   "is_uvr_vip": false
+  },
+  "melband_roformer_inst_v1_plus.ckpt": {
+   "type": "",
+   "name": "melband_roformer_inst_v1_plus.ckpt",
+   "is_uvr_vip": false
+  },
+  "melband_roformer_inst_v1e.ckpt": {
+   "type": "",
+   "name": "melband_roformer_inst_v1e.ckpt",
+   "is_uvr_vip": false
+  },
+  "melband_roformer_inst_v1e_plus.ckpt": {
+   "type": "",
+   "name": "melband_roformer_inst_v1e_plus.ckpt",
+   "is_uvr_vip": false
+  },
+  "melband_roformer_inst_v2.ckpt": {
+   "type": "",
+   "name": "melband_roformer_inst_v2.ckpt",
+   "is_uvr_vip": false
+  },
+  "melband_roformer_instvoc_duality_v1.ckpt": {
+   "type": "",
+   "name": "melband_roformer_instvoc_duality_v1.ckpt",
+   "is_uvr_vip": false
+  },
+  "melband_roformer_instvox_duality_v2.ckpt": {
+   "type": "",
+   "name": "melband_roformer_instvox_duality_v2.ckpt",
+   "is_uvr_vip": false
+  },
+  "MelBandRoformerBigSYHFTV1.ckpt": {
+   "type": "",
+   "name": "MelBandRoformerBigSYHFTV1.ckpt",
+   "is_uvr_vip": false
+  },
+  "MelBandRoformerSYHFT.ckpt": {
+   "type": "",
+   "name": "MelBandRoformerSYHFT.ckpt",
+   "is_uvr_vip": false
+  },
+  "MelBandRoformerSYHFTV2.5.ckpt": {
+   "type": "",
+   "name": "MelBandRoformerSYHFTV2.5.ckpt",
+   "is_uvr_vip": false
+  },
+  "MelBandRoformerSYHFTV2.ckpt": {
+   "type": "",
+   "name": "MelBandRoformerSYHFTV2.ckpt",
+   "is_uvr_vip": false
+  },
+  "MelBandRoformerSYHFTV3Epsilon.ckpt": {
+   "type": "",
+   "name": "MelBandRoformerSYHFTV3Epsilon.ckpt",
+   "is_uvr_vip": false
+  },
+  "MGM_HIGHEND_v4.pth": {
+   "type": "",
+   "name": "MGM_HIGHEND_v4.pth",
+   "is_uvr_vip": false
+  },
+  "MGM_LOWEND_A_v4.pth": {
+   "type": "",
+   "name": "MGM_LOWEND_A_v4.pth",
+   "is_uvr_vip": false
+  },
+  "MGM_LOWEND_B_v4.pth": {
+   "type": "",
+   "name": "MGM_LOWEND_B_v4.pth",
+   "is_uvr_vip": false
+  },
+  "MGM_MAIN_v4.pth": {
+   "type": "",
+   "name": "MGM_MAIN_v4.pth",
+   "is_uvr_vip": false
+  },
+  "model_bs_roformer_ep_317_sdr_12.9755.ckpt": {
+   "type": "",
+   "name": "model_bs_roformer_ep_317_sdr_12.9755.ckpt",
+   "is_uvr_vip": false
+  },
+  "model_bs_roformer_ep_368_sdr_12.9628.ckpt": {
+   "type": "",
+   "name": "model_bs_roformer_ep_368_sdr_12.9628.ckpt",
+   "is_uvr_vip": false
+  },
+  "model_bs_roformer_ep_937_sdr_10.5309.ckpt": {
+   "type": "",
+   "name": "model_bs_roformer_ep_937_sdr_10.5309.ckpt",
+   "is_uvr_vip": false
+  },
+  "model_chorus_bs_roformer_ep_267_sdr_24.1275.ckpt": {
+   "type": "",
+   "name": "model_chorus_bs_roformer_ep_267_sdr_24.1275.ckpt",
+   "is_uvr_vip": false
+  },
+  "model_mel_band_roformer_ep_3005_sdr_11.4360.ckpt": {
+   "type": "",
+   "name": "model_mel_band_roformer_ep_3005_sdr_11.4360.ckpt",
+   "is_uvr_vip": false
+  },
+  "Reverb_HQ_By_FoxJoy.onnx": {
+   "type": "",
+   "name": "Reverb_HQ_By_FoxJoy.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-BVE-4B_SN-44100-1.pth": {
+   "type": "",
+   "name": "UVR-BVE-4B_SN-44100-1.pth",
+   "is_uvr_vip": false
+  },
+  "UVR-BVE-4B_SN-44100-2.pth": {
+   "type": "",
+   "name": "UVR-BVE-4B_SN-44100-2.pth",
+   "is_uvr_vip": false
+  },
+  "UVR-De-Echo-Aggressive.pth": {
+   "type": "",
+   "name": "UVR-De-Echo-Aggressive.pth",
+   "is_uvr_vip": false
+  },
+  "UVR-De-Echo-Normal.pth": {
+   "type": "",
+   "name": "UVR-De-Echo-Normal.pth",
+   "is_uvr_vip": false
+  },
+  "UVR-De-Reverb-aufr33-jarredou.pth": {
+   "type": "",
+   "name": "UVR-De-Reverb-aufr33-jarredou.pth",
+   "is_uvr_vip": false
+  },
+  "UVR-DeEcho-DeReverb.pth": {
+   "type": "",
+   "name": "UVR-DeEcho-DeReverb.pth",
+   "is_uvr_vip": false
+  },
+  "UVR-DeNoise-Lite.pth": {
+   "type": "",
+   "name": "UVR-DeNoise-Lite.pth",
+   "is_uvr_vip": false
+  },
+  "UVR-DeNoise.pth": {
+   "type": "",
+   "name": "UVR-DeNoise.pth",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET-Inst_1.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET-Inst_1.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET-Inst_2.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET-Inst_2.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET-Inst_3.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET-Inst_3.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET-Inst_full_292.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET-Inst_full_292.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET-Inst_HQ_1.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET-Inst_HQ_1.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET-Inst_HQ_2.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET-Inst_HQ_2.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET-Inst_HQ_3.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET-Inst_HQ_3.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET-Inst_HQ_4.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET-Inst_HQ_4.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET-Inst_HQ_5.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET-Inst_HQ_5.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET-Inst_Main.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET-Inst_Main.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET-Voc_FT.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET-Voc_FT.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET_Crowd_HQ_1.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET_Crowd_HQ_1.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET_Inst_187_beta.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET_Inst_187_beta.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET_Inst_82_beta.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET_Inst_82_beta.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET_Inst_90_beta.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET_Inst_90_beta.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET_Main_340.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET_Main_340.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET_Main_390.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET_Main_390.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET_Main_406.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET_Main_406.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET_Main_427.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET_Main_427.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR-MDX-NET_Main_438.onnx": {
+   "type": "",
+   "name": "UVR-MDX-NET_Main_438.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR_MDXNET_1_9703.onnx": {
+   "type": "",
+   "name": "UVR_MDXNET_1_9703.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR_MDXNET_2_9682.onnx": {
+   "type": "",
+   "name": "UVR_MDXNET_2_9682.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR_MDXNET_3_9662.onnx": {
+   "type": "",
+   "name": "UVR_MDXNET_3_9662.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR_MDXNET_9482.onnx": {
+   "type": "",
+   "name": "UVR_MDXNET_9482.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR_MDXNET_KARA.onnx": {
+   "type": "",
+   "name": "UVR_MDXNET_KARA.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR_MDXNET_KARA_2.onnx": {
+   "type": "",
+   "name": "UVR_MDXNET_KARA_2.onnx",
+   "is_uvr_vip": false
+  },
+  "UVR_MDXNET_Main.onnx": {
+   "type": "",
+   "name": "UVR_MDXNET_Main.onnx",
+   "is_uvr_vip": false
+  },
+  "vocals_mel_band_roformer.ckpt": {
+   "type": "",
+   "name": "vocals_mel_band_roformer.ckpt",
+   "is_uvr_vip": false
+  }
+ }
+}

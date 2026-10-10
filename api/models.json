@@ -15,17 +15,19 @@
     "license": "UNSPECIFIED",
     "download": {
       "repo": "pcunwa/BS-Roformer-HyperACE",
-      "revision": "main",
+      "revision": "5b1f8283125d5e4a3614d0e3635a636e09c84059",
       "files": [
         {
           "remote": "v2_voc/bs_roformer_voc_hyperacev2.ckpt",
           "dest": "bs_roformer_voc_hyperacev2.ckpt",
-          "size": 288724430
+          "size": 288724430,
+          "sha256": "54cf516f621f2f460bf660ed137e244b8931bf7a2ce85ddceecff816dbc4d668"
         },
         {
           "remote": "v2_voc/config.yaml",
           "dest": "config.yaml",
-          "size": 1969
+          "size": 1969,
+          "sha256": "033e57abee226a480ef410e0631b9fe00e8b7bc9a3bb5fe55659d0b43a238701"
         }
       ]
     }
@@ -46,17 +48,19 @@
     "license": "UNSPECIFIED",
     "download": {
       "repo": "pcunwa/BS-Roformer-HyperACE",
-      "revision": "main",
+      "revision": "5b1f8283125d5e4a3614d0e3635a636e09c84059",
       "files": [
         {
           "remote": "v2_inst/bs_roformer_inst_hyperacev2.ckpt",
           "dest": "bs_roformer_inst_hyperacev2.ckpt",
-          "size": 288725646
+          "size": 288725646,
+          "sha256": "4d61178ef966d2b4e9ad456ffbbc6fd5b2828df07a7af32931142c1a5ff1fe6f"
         },
         {
           "remote": "v2_inst/config.yaml",
           "dest": "config.yaml",
-          "size": 1973
+          "size": 1973,
+          "sha256": "85d10906007df21ee48dbb86faa09205609274eb38ea224dce767e2844d0a934"
         }
       ]
     }
@@ -95,15 +99,19 @@
   "bs_polarformer_vocals": {
     "download": {
       "repo": "noblebarkrr/mvsepless_resources",
-      "revision": "main",
+      "revision": "030a01aa951b3908ed6b01b2e507c17953300c2d",
       "files": [
         {
           "remote": "bs_roformer/bs_siamese_vocals_unwa.ckpt",
-          "dest": "bs_siamese_vocals_unwa.ckpt"
+          "dest": "bs_siamese_vocals_unwa.ckpt",
+          "size": 204682749,
+          "sha256": "cf5456f703931bdc5415c167453b4d88630c3adb1f2d4de462423faa52b30b79"
         },
         {
           "remote": "bs_roformer/bs_siamese_vocals_unwa_config.yaml",
-          "dest": "config.yaml"
+          "dest": "config.yaml",
+          "size": 1983,
+          "sha256": "03f9c4206e0b1f4429db248d5b45f879b7db02eab75be97a33dee794d3e9daff"
         }
       ]
     },
@@ -137,17 +145,19 @@
     "license": "CC-BY-NC-4.0",
     "download": {
       "repo": "becruily/mel-band-roformer-deux",
-      "revision": "main",
+      "revision": "2da74427d682a3df47a774378fc24d7a1a0cdaad",
       "files": [
         {
           "remote": "becruily_deux.ckpt",
           "dest": "becruily_deux.ckpt",
-          "size": 435006815
+          "size": 435006815,
+          "sha256": "10255c02295bf3e3865d4ee50ff752d7b19b124ed5fd93b147babc4333eda3aa"
         },
         {
           "remote": "config_deux_becruily.yaml",
           "dest": "config.yaml",
-          "size": 1175
+          "size": 1175,
+          "sha256": "bb3ea9bce37ca96d63568490d5a92d7e41df3d7726788b6970c10d89eb62d902"
         }
       ]
     }
@@ -155,15 +165,19 @@
   "mel_band_roformer_flowers_v10": {
     "download": {
       "repo": "noblebarkrr/mvsepless_resources",
-      "revision": "main",
+      "revision": "030a01aa951b3908ed6b01b2e507c17953300c2d",
       "files": [
         {
           "remote": "mel_band_roformer/mbr_instflowersv10_gabox.ckpt",
-          "dest": "mbr_instflowersv10_gabox.ckpt"
+          "dest": "mbr_instflowersv10_gabox.ckpt",
+          "size": 489571079,
+          "sha256": "fe3aa51927beb60ff345b8b672c11760fb8bdaa6039d8c61631416a5b4f7a047"
         },
         {
           "remote": "mel_band_roformer/mbr_instflowersv10_gabox_config.yaml",
-          "dest": "config.yaml"
+          "dest": "config.yaml",
+          "size": 1406,
+          "sha256": "c6e3676706f89b7aba8fb4dbcaa2be3b9ee7dec9c4ce32451b180a7dfc9f4090"
         }
       ]
     },
@@ -266,20 +280,28 @@
     ],
     "checkpoint": "htdemucs_4stem.ckpt",
     "model_type": "multi_stem_models",
-    "license": "MIT"
+    "license": "MIT",
+    "instrumentTargets": [
+      "drums",
+      "bass"
+    ]
   },
   "mbr_instfv9_gabox": {
     "download": {
       "repo": "noblebarkrr/mvsepless_resources",
-      "revision": "main",
+      "revision": "030a01aa951b3908ed6b01b2e507c17953300c2d",
       "files": [
         {
           "remote": "mel_band_roformer/mbr_instfv9_gabox.ckpt",
-          "dest": "mbr_instfv9_gabox.ckpt"
+          "dest": "mbr_instfv9_gabox.ckpt",
+          "size": 913090472,
+          "sha256": "a6c02cd154bb49d6d08044a8dc935a94ec26d09f2a0e6a03cc80a65d05a98ff2"
         },
         {
           "remote": "mel_band_roformer/mbr_instfv9_gabox_config.yaml",
-          "dest": "config.yaml"
+          "dest": "config.yaml",
+          "size": 887,
+          "sha256": "84eb113dec40afea7e787ba364a803caf839ec5df3b4db56cb8ae97af988c62e"
         }
       ]
     },
@@ -301,15 +323,19 @@
   "mbr_instfv9_2_gabox": {
     "download": {
       "repo": "noblebarkrr/mvsepless_resources",
-      "revision": "main",
+      "revision": "030a01aa951b3908ed6b01b2e507c17953300c2d",
       "files": [
         {
           "remote": "mel_band_roformer/mbr_instfv9_2_gabox.ckpt",
-          "dest": "mbr_instfv9_2_gabox.ckpt"
+          "dest": "mbr_instfv9_2_gabox.ckpt",
+          "size": 913091027,
+          "sha256": "068d29a54e71f69ed871ca410e09b9877e153ad1439e825bd093573ea4de5762"
         },
         {
           "remote": "mel_band_roformer/mbr_instfv9_2_gabox_config.yaml",
-          "dest": "config.yaml"
+          "dest": "config.yaml",
+          "size": 887,
+          "sha256": "84eb113dec40afea7e787ba364a803caf839ec5df3b4db56cb8ae97af988c62e"
         }
       ]
     },
@@ -345,17 +371,19 @@
     "license": "CC-BY-NC-4.0",
     "download": {
       "repo": "becruily/mel-band-roformer-deux",
-      "revision": "main",
+      "revision": "2da74427d682a3df47a774378fc24d7a1a0cdaad",
       "files": [
         {
           "remote": "becruily_deux.ckpt",
           "dest": "becruily_deux.ckpt",
-          "size": 435006815
+          "size": 435006815,
+          "sha256": "10255c02295bf3e3865d4ee50ff752d7b19b124ed5fd93b147babc4333eda3aa"
         },
         {
           "remote": "config_deux_becruily.yaml",
           "dest": "config.yaml",
-          "size": 1175
+          "size": 1175,
+          "sha256": "bb3ea9bce37ca96d63568490d5a92d7e41df3d7726788b6970c10d89eb62d902"
         }
       ]
     }
@@ -377,5 +405,650 @@
     "checkpoint": "bs_roformer_inst_hyperacev2.ckpt",
     "model_type": "vocal_models",
     "license": "UNSPECIFIED"
+  },
+  "uvr_2hp": {
+    "registry": "2_HP-UVR.pth",
+    "name": "2 HP UVR",
+    "arch": "VR",
+    "target": "dual",
+    "tags": [
+      "full band"
+    ],
+    "sizeMB": 121,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "bs_roformer_voc_gabox": {
+    "registry": "bs_roformer_vocals_gabox.ckpt",
+    "name": "BS-RoFormer Vocals (Gabox)",
+    "arch": "BS-RoFormer",
+    "target": "vocals",
+    "tags": [
+      "fuller sound"
+    ],
+    "sizeMB": 610,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mbr_inst_v1e_plus": {
+    "registry": "melband_roformer_inst_v1e_plus.ckpt",
+    "name": "Mel-Band RoFormer Inst V1E Plus",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "low bleed"
+    ],
+    "sizeMB": 871,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mbr_inst_v2": {
+    "registry": "melband_roformer_inst_v2.ckpt",
+    "name": "Mel-Band RoFormer Inst V2",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "clean boundary"
+    ],
+    "sizeMB": 1502,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mbr_inst_3_gabox": {
+    "registry": "mel_band_roformer_instrumental_3_gabox.ckpt",
+    "name": "Mel-Band RoFormer Inst 3 (Gabox)",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "balanced"
+    ],
+    "sizeMB": 871,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mbr_fullness_v4": {
+    "registry": "mel_band_roformer_instrumental_fullness_v4_gabox.ckpt",
+    "name": "Mel-Band RoFormer Fullness V4",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "fuller sound"
+    ],
+    "sizeMB": 871,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mbr_fullness_noise_v4": {
+    "registry": "mel_band_roformer_instrumental_fullness_noise_v4_gabox.ckpt",
+    "name": "Mel-Band RoFormer Fullness Noise V4",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "noise reduction"
+    ],
+    "sizeMB": 871,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mbr_inst_fv8": {
+    "registry": "mel_band_roformer_instrumental_fv8_gabox.ckpt",
+    "name": "Mel-Band RoFormer Inst FV8",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "dual stems"
+    ],
+    "sizeMB": 871,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mbr_inst_fvx": {
+    "registry": "mel_band_roformer_instrumental_fvx_gabox.ckpt",
+    "name": "Mel-Band RoFormer Inst FVX",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "detailed split"
+    ],
+    "sizeMB": 871,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mbr_instv8": {
+    "registry": "mel_band_roformer_instrumental_instv8_gabox.ckpt",
+    "name": "Mel-Band RoFormer InstV8",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "stable stems"
+    ],
+    "sizeMB": 871,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mbr_instv8n": {
+    "registry": "mel_band_roformer_instrumental_instv8n_gabox.ckpt",
+    "name": "Mel-Band RoFormer InstV8N",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "breaths & tails"
+    ],
+    "sizeMB": 871,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mdx23c_instvoc_hq_2": {
+    "registry": "MDX23C-8KFFT-InstVoc_HQ_2.ckpt",
+    "name": "MDX23C InstVoc HQ 2",
+    "arch": "MDX23C",
+    "target": "dual",
+    "tags": [
+      "high quality"
+    ],
+    "sizeMB": 428,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mdx23c_d1581": {
+    "registry": "MDX23C_D1581.ckpt",
+    "name": "MDX23C D1581",
+    "arch": "MDX23C",
+    "target": "dual",
+    "tags": [
+      "balanced"
+    ],
+    "sizeMB": 175,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mbr_duality_v1": {
+    "registry": "melband_roformer_instvoc_duality_v1.ckpt",
+    "name": "Mel-Band RoFormer InstVoc Duality V1",
+    "arch": "MelBand-RoFormer",
+    "target": "dual",
+    "tags": [],
+    "sizeMB": 1640,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "mbr_instvox_duality_v2": {
+    "registry": "melband_roformer_instvox_duality_v2.ckpt",
+    "name": "Mel-Band RoFormer InstVox Duality V2",
+    "arch": "MelBand-RoFormer",
+    "target": "dual",
+    "tags": [],
+    "sizeMB": 1640,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED"
+  },
+  "htdemucs": {
+    "registry": "htdemucs.yaml",
+    "name": "HTDemucs",
+    "arch": "HTDemucs",
+    "target": "4-stem",
+    "tags": [
+      "balanced"
+    ],
+    "sizeMB": 80,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "stems": [
+      "drums",
+      "bass",
+      "vocals",
+      "other"
+    ],
+    "instrumentTargets": [
+      "drums",
+      "bass"
+    ]
+  },
+  "hdemucs_mmi": {
+    "registry": "hdemucs_mmi.yaml",
+    "name": "Hybrid Demucs (MMI)",
+    "arch": "HybridDemucs",
+    "target": "4-stem",
+    "tags": [
+      "detailed split"
+    ],
+    "sizeMB": 159,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "stems": [
+      "drums",
+      "bass",
+      "vocals",
+      "other"
+    ],
+    "unsupported": "Produces non-finite samples on real audio here: inference completes but the stem write fails with 'Audio data must contain only finite values'. Verified on 3 separate recordings; the cached checkpoint was re-downloaded and is byte-for-byte the same size, so this is not corruption."
+  },
+  "htdemucs_6s": {
+    "registry": "htdemucs_6s.yaml",
+    "name": "HTDemucs 6-Source",
+    "arch": "HTDemucs",
+    "target": "multi",
+    "tags": [
+      "dual stems"
+    ],
+    "sizeMB": 52,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "stems": [
+      "drums",
+      "bass",
+      "vocals",
+      "guitar",
+      "piano",
+      "other"
+    ],
+    "instrumentTargets": [
+      "drums",
+      "bass",
+      "guitar",
+      "piano"
+    ]
+  },
+  "mbr_vocals_center": {
+    "registry": "vocals_mel_band_roformer.ckpt",
+    "name": "Mel-Band RoFormer Vocals",
+    "arch": "MelBand-RoFormer",
+    "target": "vocals",
+    "tags": [
+      "balanced"
+    ],
+    "sizeMB": 870,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "stems": [
+      "vocals",
+      "other"
+    ],
+    "categories": [
+      "Center"
+    ]
+  },
+  "bs_roformer_male_female": {
+    "registry": "bs_roformer_male_female_by_aufr33_sdr_7.2889.ckpt",
+    "name": "BS-RoFormer Male / Female",
+    "arch": "BS-RoFormer",
+    "target": "vocals",
+    "tags": [
+      "detailed split"
+    ],
+    "sizeMB": 502,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "stems": [
+      "male",
+      "female"
+    ],
+    "categories": [
+      "Male/Female"
+    ]
+  },
+  "bs_roformer_gender_ep267": {
+    "registry": "model_chorus_bs_roformer_ep_267_sdr_24.1275.ckpt",
+    "name": "BS-RoFormer Male / Female (EP267)",
+    "arch": "BS-RoFormer",
+    "target": "vocals",
+    "tags": [
+      "detailed split"
+    ],
+    "sizeMB": 502,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "stems": [
+      "male",
+      "female"
+    ],
+    "categories": [
+      "Male/Female"
+    ]
+  },
+  "mbr_crowd": {
+    "registry": "mel_band_roformer_crowd_aufr33_viperx_sdr_8.7144.ckpt",
+    "name": "Mel-Band RoFormer Crowd",
+    "arch": "MelBand-RoFormer",
+    "target": "vocals",
+    "tags": [
+      "noise reduction"
+    ],
+    "sizeMB": 870,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "stems": [
+      "crowd",
+      "other"
+    ],
+    "categories": [
+      "Crowd"
+    ]
+  },
+  "bs_roformer_viperx_1297": {
+    "registry": "model_bs_roformer_ep_317_sdr_12.9755.ckpt",
+    "name": "BS-RoFormer Viperx 1297",
+    "arch": "BS-RoFormer",
+    "target": "dual",
+    "tags": [
+      "low bleed"
+    ],
+    "sizeMB": 609,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "stems": [
+      "vocals",
+      "instrumental"
+    ],
+    "categories": [
+      "Center"
+    ]
+  },
+  "bs_roformer_viperx_1296": {
+    "registry": "model_bs_roformer_ep_368_sdr_12.9628.ckpt",
+    "name": "BS-RoFormer Viperx 1296",
+    "arch": "BS-RoFormer",
+    "target": "dual",
+    "tags": [
+      "stable stems"
+    ],
+    "sizeMB": 609,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "stems": [
+      "vocals",
+      "instrumental"
+    ],
+    "categories": [
+      "Center"
+    ]
+  },
+  "mbr_bleed_suppressor": {
+    "name": "Mel-Band RoFormer Bleed Suppressor",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "low bleed"
+    ],
+    "sizeMB": 870,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "registry": "mel_band_roformer_bleed_suppressor_v1.ckpt",
+    "stems": [
+      "bleed",
+      "instrumental"
+    ]
+  },
+  "mbr_metal_mesk": {
+    "name": "Metal Inst (MESK)",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "detailed split"
+    ],
+    "sizeMB": 900,
+    "source": "Hugging Face Politrees/UVR_resources",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "download": {
+      "repo": "Politrees/UVR_resources",
+      "repoType": "hf",
+      "revision": "929e057b81aa49bc2e6490bef8671f47b2c120f6",
+      "files": [
+        {
+          "remote": "models/Roformer/MelBand/melband_roformer_inst_metal_prev_by_mesk.ckpt",
+          "dest": "melband_roformer_inst_metal_prev_by_mesk.ckpt",
+          "size": 944683368,
+          "sha256": "46f3f92abdd76ebe192f7c9e6167bf4d75fcffd21628f7844e7e48da42bcd7eb"
+        },
+        {
+          "remote": "models/Roformer/MelBand/config_melband_roformer_inst_metal_prev_by_mesk.yaml",
+          "dest": "config_melband_roformer_inst_metal_prev_by_mesk.yaml",
+          "size": 1087,
+          "sha256": "58ea9deb287eddead32373f3e35ccf55a2c1aac70a3e4fe6dbb7ca12aa21d0fa"
+        }
+      ]
+    },
+    "stems": [
+      "vocals",
+      "other"
+    ]
+  },
+  "mbr_bve_gonza": {
+    "name": "Lead / Backing Vocals (Gonza)",
+    "arch": "MelBand-RoFormer",
+    "target": "vocals",
+    "tags": [
+      "stable stems"
+    ],
+    "sizeMB": 870,
+    "source": "Hugging Face Politrees/UVR_resources",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "download": {
+      "repo": "Politrees/UVR_resources",
+      "repoType": "hf",
+      "revision": "929e057b81aa49bc2e6490bef8671f47b2c120f6",
+      "files": [
+        {
+          "remote": "models/Roformer/MelBand/model_MelBand-Roformer_BVE_by-Gonza.ckpt",
+          "dest": "model_MelBand-Roformer_BVE_by-Gonza.ckpt",
+          "size": 913090472,
+          "sha256": "e003bbb97ebef78c59cd6b46c5fc3d0f2303cd49f6fb98eb8b8f0f8075899ae3"
+        },
+        {
+          "remote": "models/Roformer/MelBand/config_MelBand-Roformer_BVE_by-Gonza.yaml",
+          "dest": "config_MelBand-Roformer_BVE_by-Gonza.yaml",
+          "size": 1758,
+          "sha256": "2b88a4421fbba171f829254a7097b8e085a5f67c472aa1ddaef76108fd8e68fa"
+        }
+      ]
+    },
+    "stems": [
+      "lead",
+      "back"
+    ]
+  },
+  "mbr_duality_aname": {
+    "name": "Mel-Band RoFormer Duality V1 (Aname)",
+    "arch": "MelBand-RoFormer",
+    "target": "dual",
+    "tags": [
+      "balanced"
+    ],
+    "sizeMB": 870,
+    "source": "Hugging Face Politrees/UVR_resources",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "download": {
+      "repo": "Politrees/UVR_resources",
+      "repoType": "hf",
+      "revision": "929e057b81aa49bc2e6490bef8671f47b2c120f6",
+      "files": [
+        {
+          "remote": "models/Roformer/MelBand/model_MelBand-Roformer_Duality_v1_by-Aname.ckpt",
+          "dest": "model_MelBand-Roformer_Duality_v1_by-Aname.ckpt",
+          "size": 913043907,
+          "sha256": "69c244e76d7142a948f0d41c67e293112ba84f12a28c89d24b22a3fecd9ef79e"
+        },
+        {
+          "remote": "models/Roformer/MelBand/config_MelBand-Roformer_Duality_v1_by-Aname.yaml",
+          "dest": "config_MelBand-Roformer_Duality_v1_by-Aname.yaml",
+          "size": 1723,
+          "sha256": "3b39a127b806fbbe2dd6880c6bf9b5e96174750c1cf86698d466480821bc7153"
+        }
+      ]
+    },
+    "stems": [
+      "vocals",
+      "other"
+    ]
+  },
+  "mbr_guitar_becruily": {
+    "name": "Guitar (becruily)",
+    "arch": "MelBand-RoFormer",
+    "target": "instrumental",
+    "tags": [
+      "detailed split"
+    ],
+    "sizeMB": 41,
+    "source": "Hugging Face Politrees/UVR_resources",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "download": {
+      "repo": "Politrees/UVR_resources",
+      "repoType": "hf",
+      "revision": "929e057b81aa49bc2e6490bef8671f47b2c120f6",
+      "files": [
+        {
+          "remote": "models/Roformer/MelBand/melband_roformer_guitar_becruily.ckpt",
+          "dest": "melband_roformer_guitar_becruily.ckpt",
+          "size": 45142183,
+          "sha256": "83472bbf125774af5282d2e0b86df89eaf2dd45e8a4ec8d68e820ebf3e42a83c"
+        },
+        {
+          "remote": "models/Roformer/MelBand/config_melband_roformer_guitar_becruily.yaml",
+          "dest": "config_melband_roformer_guitar_becruily.yaml",
+          "size": 1411,
+          "sha256": "b681c3f886251b04b666b3f06e87ce65d7ec610e40b5d75915c01782e5444b0e"
+        }
+      ]
+    },
+    "stems": [
+      "guitar",
+      "other"
+    ],
+    "instrumentTargets": [
+      "guitar"
+    ]
+  },
+  "drumsep_mdx23c": {
+    "name": "DrumSep (MDX23C)",
+    "arch": "MDX-C",
+    "target": "multi",
+    "tags": [
+      "drum family detail"
+    ],
+    "sizeMB": 448,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "registry": "MDX23C-DrumSep-aufr33-jarredou.ckpt",
+    "stems": [
+      "kick",
+      "snare",
+      "toms",
+      "hh",
+      "ride",
+      "crash"
+    ],
+    "instrumentTargets": [
+      "kick",
+      "snare",
+      "toms",
+      "hihat",
+      "ride",
+      "crash"
+    ]
+  },
+  "htdemucs_ft": {
+    "name": "HTDemucs Fine-Tuned",
+    "arch": "HTDemucs",
+    "target": "4-stem",
+    "tags": [
+      "fine-tuned split"
+    ],
+    "sizeMB": 320,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "registry": "htdemucs_ft.yaml",
+    "stems": [
+      "drums",
+      "bass",
+      "vocals",
+      "other"
+    ],
+    "instrumentTargets": [
+      "drums",
+      "bass"
+    ]
+  },
+  "mdx_dereverb": {
+    "name": "De-Reverb (MDX23C)",
+    "arch": "MDX-C",
+    "target": "dual",
+    "tags": [
+      "reverb removal"
+    ],
+    "sizeMB": 448,
+    "source": "audio-separator model registry",
+    "sdr": null,
+    "model_type": "vocal_models",
+    "license": "UNSPECIFIED",
+    "registry": "MDX23C-De-Reverb-aufr33-jarredou.ckpt",
+    "stems": [
+      "dry",
+      "No dry"
+    ],
+    "categories": [
+      "Dereverb"
+    ]
   }
 }

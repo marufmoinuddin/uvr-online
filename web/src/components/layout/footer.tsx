@@ -19,7 +19,7 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
       { label: "Extract Vocals", href: "/tools/extract-vocals" },
       { label: "Karaoke Maker", href: "/tools/karaoke" },
       { label: "Stem Splitter", href: "/tools/stem-splitter" },
-      { label: "Noise Removal", href: "/tools/denoise" },
+      { label: "Audio Repair", href: "/tools/audio-repair" },
       { label: "Acapella Extractor", href: "/tools/acapella" },
     ],
   },
@@ -32,7 +32,14 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
   },
   {
     title: "Support",
-    links: [{ label: "FAQ", href: "/faq" }],
+    links: [
+      { label: "FAQ", href: "/faq" },
+      // Real destinations only. The reference site also links Changelog,
+      // Contact Us and a macOS app — none of which exist here, and a dead link
+      // is worse than a missing one.
+      { label: "Recent jobs", href: "/tools/history" },
+      { label: "All tools", href: "/tools" },
+    ],
   },
 ];
 

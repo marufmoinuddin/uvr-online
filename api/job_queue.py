@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from backend import separate_file
+from repair import repair_file
 
 logger = logging.getLogger("uvr.queue")
 
@@ -60,12 +61,17 @@ class Job:
     output_dir: Optional[str] = None
     options: dict[str, Any] = field(default_factory=dict)
     cancelled: bool = False
+    # "separate" runs a model; "repair" runs ffmpeg DSP and produces a single
+    # corrected file. Jobs persisted before this field existed are separations,
+    # which is what the default has to be.
+    kind: str = "separate"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "status": self.status,
             "scene": self.scene,
+            "kind": self.kind,
             "modelId": self.model_id,
             "fileName": self.file_name,
             "progress": round(self.progress, 1),
@@ -146,6 +152,7 @@ class JobQueue:
                     output_dir=row.get("outputDir"),
                     options=row.get("options") or {},
                     cancelled=bool(row.get("cancelled")),
+                    kind=row.get("kind") or "separate",
                 )
             except Exception:  # pragma: no cover - skip malformed rows
                 continue
@@ -179,6 +186,7 @@ class JobQueue:
         file_name: str,
         options: dict[str, Any],
         input_path: str,
+        kind: str = "separate",
     ) -> Job:
         job_id = uuid.uuid4().hex[:12]
         job = Job(
@@ -189,6 +197,7 @@ class JobQueue:
             options=options,
             input_path=input_path,
             output_dir=str(OUTPUT_ROOT / job_id),
+            kind=kind,
         )
         async with self._lock:
             self._jobs[job.id] = job
@@ -317,20 +326,33 @@ class JobQueue:
         if job.cancelled:
             return
         job.status = "processing"
-        job.stage = "gpu"
-        job.eta_sec = 30.0
+        # Repair is ffmpeg DSP and never touches the GPU, so labelling it "GPU
+        # inference" would be a lie in the progress readout.
+        job.stage = "assemble" if job.kind == "repair" else "gpu"
+        job.eta_sec = 30.0 if job.kind == "separate" else 5.0
         await self._broadcast(job)
         try:
-            stems = await asyncio.to_thread(
-                separate_file,
-                job.model_id,
-                job.input_path,
-                job.output_dir,
-                job.options.get("outputFormat", "mp3"),
-                job.options.get("useTTA", False),
-                job.options.get("extractInstrumental", False),
-                lambda p, s: self._on_progress(job, p, s),
-            )
+            if job.kind == "repair":
+                stems = await asyncio.to_thread(
+                    repair_file,
+                    job.input_path,
+                    job.output_dir,
+                    job.options.get("repairOps") or [],
+                    job.options.get("outputFormat", "wav"),
+                    lambda p, s: self._on_progress(job, p, s),
+                )
+            else:
+                stems = await asyncio.to_thread(
+                    separate_file,
+                    job.model_id,
+                    job.input_path,
+                    job.output_dir,
+                    job.options.get("outputFormat", "mp3"),
+                    job.options.get("useTTA", False),
+                    job.options.get("extractInstrumental", False),
+                    lambda p, s: self._on_progress(job, p, s),
+                    job.options.get("extractTarget") or None,
+                )
             if job.cancelled:
                 self._discard_output(job)
                 job.status = "cancelled"
@@ -344,9 +366,13 @@ class JobQueue:
             # explanation. Fail loudly instead.
             if not stems:
                 raise RuntimeError(
-                    "The separation produced no audio. The model may be "
-                    "incompatible with this backend, or the input had no "
-                    "decodable audio stream."
+                    "The repair produced no audio."
+                    if job.kind == "repair"
+                    else (
+                        "The separation produced no audio. The model may be "
+                        "incompatible with this backend, or the input had no "
+                        "decodable audio stream."
+                    )
                 )
             job.result_stems = stems
             job.download_urls = [s["url"] for s in stems]

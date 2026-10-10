@@ -31,11 +31,19 @@ import {
 import { useStore } from "@/lib/store";
 import { useJobs } from "@/hooks/useJobs";
 import { reuseJob, cancelJob, clearJobs as clearJobsApi, deleteJob } from "@/lib/api";
-import { MODEL_CATALOG } from "@/lib/models";
+import { MODEL_CATALOG, getScene } from "@/lib/models";
 import type { Job } from "@/lib/types";
 
-/** Resolve a model display name from its ID, handling `ensemble:` prefixed IDs. */
+/** Sentinel the worker stores in place of a model for repair jobs. */
+const REPAIR_MODEL_ID = "__repair__";
+
+/** Resolve a model display name from its ID, handling `ensemble:` and repair. */
 function modelDisplayName(modelId: string): string {
+  if (modelId === REPAIR_MODEL_ID) {
+    // Repair jobs carry no model at all; showing the sentinel would leak an
+    // implementation detail into the UI.
+    return "Audio Repair";
+  }
   if (modelId.startsWith("ensemble:")) {
     const mode = modelId.slice("ensemble:".length).replace(/_/g, " ");
     return `Ensemble · ${mode}`;
@@ -60,7 +68,22 @@ const STAGE_ICONS: Record<Job["stage"], React.ReactNode> = {
   done: <CheckCircle2 className="h-3.5 w-3.5" />,
 };
 
-function JobCard({ job }: { job: Job }) {
+function JobCard({
+  job,
+  showScene,
+  stemsCollapsed = false,
+  onToggleStems,
+}: {
+  job: Job;
+  showScene?: boolean;
+  /**
+   * Hide the audio players for this job. Each StemPlayer mounts an <audio>
+   * element plus a canvas, so a long history would otherwise create hundreds
+   * of them. Download / Re-run / Delete stay available either way.
+   */
+  stemsCollapsed?: boolean;
+  onToggleStems?: () => void;
+}) {
   const removeJob = useStore((s) => s.removeJob);
   const [reusing, setReusing] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
@@ -101,6 +124,13 @@ function JobCard({ job }: { job: Job }) {
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{job.fileName}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
+            {/* The history page lists jobs from every tool, so the scene has to be
+                visible there; in the workbench it is always the current one. */}
+            {showScene && (
+              <>
+                {getScene(job.scene).label} ·{" "}
+              </>
+            )}
             {modelDisplayName(job.modelId)} · {timeAgo(job.createdAt)}
           </p>
         </div>
@@ -171,15 +201,27 @@ function JobCard({ job }: { job: Job }) {
 
       {job.status === "ready" && job.resultStems && (
         <div className="mt-3 space-y-2">
-          {job.resultStems.map((stem, i) => (
-            <StemPlayer
-              key={stem.name}
-              name={stem.name}
-              url={stem.url}
-              group={job.id}
-              color={["#6366f1", "#8b5cf6", "#ec4899", "#10b981", "#f59e0b"][i % 5]}
-            />
-          ))}
+          {stemsCollapsed ? (
+            <button
+              type="button"
+              onClick={onToggleStems}
+              aria-expanded={false}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50"
+            >
+              Show {job.resultStems.length} stem
+              {job.resultStems.length === 1 ? "" : "s"}
+            </button>
+          ) : (
+            job.resultStems.map((stem, i) => (
+              <StemPlayer
+                key={stem.name}
+                name={stem.name}
+                url={stem.url}
+                group={job.id}
+                color={["#6366f1", "#8b5cf6", "#ec4899", "#10b981", "#f59e0b"][i % 5]}
+              />
+            ))
+          )}
           <div className="flex items-center gap-2 pt-1">
             <DownloadBundle stems={job.resultStems} jobId={job.id} />
             <Button

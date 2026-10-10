@@ -1,0 +1,50 @@
+{
+  "ok": true,
+  "checks": [
+    {
+      "level": "PASS",
+      "name": "ids: UI-only entries are all ensemble presets",
+      "detail": "8 exempt"
+    },
+    {
+      "level": "PASS",
+      "name": "ids: every worker model is in the UI catalog",
+      "detail": ""
+    },
+    {
+      "level": "PASS",
+      "name": "ids: catalogs in sync",
+      "detail": "16 shared"
+    },
+    {
+      "level": "PASS",
+      "name": "unsupported: flags match in both files",
+      "detail": "2 flagged"
+    },
+    {
+      "level": "PASS",
+      "name": "fetchable: every worker entry can be fetched or is flagged",
+      "detail": ""
+    },
+    {
+      "level": "PASS",
+      "name": "scenes: every defaultModelId exists",
+      "detail": "9 scenes"
+    },
+    {
+      "level": "PASS",
+      "name": "scenes: every default model is runnable",
+      "detail": ""
+    },
+    {
+      "level": "PASS",
+      "name": "scenes: every default model passes its own target filter",
+      "detail": ""
+    },
+    {
+      "level": "PASS",
+      "name": "ensembles: UI-only ids all marked ensemble:true",
+      "detail": ""
+    }
+  ]
+}

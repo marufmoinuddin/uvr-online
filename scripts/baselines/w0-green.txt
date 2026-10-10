@@ -1,0 +1,25 @@
+
+═══ 1/4 catalog integrity ═══
+✓ ids: UI-only entries are all ensemble presets               8 exempt
+✓ ids: every worker model is in the UI catalog              
+✓ ids: catalogs in sync                                       16 shared
+✓ unsupported: flags match in both files                      2 flagged
+✓ fetchable: every worker entry can be fetched or is flagged
+✓ scenes: every defaultModelId exists                         9 scenes
+✓ scenes: every default model is runnable                   
+✓ scenes: every default model passes its own target filter  
+✓ ensembles: UI-only ids all marked ensemble:true           
+
+OK — 9 checks passed
+  ✓ api/models.json and web models.ts agree
+
+═══ 2/4 catalog verifier self-test ═══
+  ✓ verifier still catches all injected bug classes
+
+═══ 3/4 backend compiles ═══
+  ✓ api/*.py compile cleanly 
+
+═══ 4/4 frontend ═══
+  ✓ typecheck + lint + production build
+
+═══ ALL GREEN ═══

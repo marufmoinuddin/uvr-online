@@ -38,6 +38,7 @@ import logging
 import os
 import shutil
 import threading
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -64,6 +65,68 @@ def _default_store() -> Path:
 MODEL_STORE: Path = _default_store()
 TMP_DIR: Path = MODEL_STORE / ".tmp"
 CATALOG_PATH = Path(os.environ.get("MODEL_CATALOG", "./models.json"))
+
+
+def _output_root() -> Path:
+    env = os.environ.get("OUTPUT_ROOT")
+    if env:
+        return Path(env).expanduser()
+    xdg = os.environ.get("XDG_DATA_HOME")
+    base = Path(xdg).expanduser() if xdg else Path.home() / ".local" / "share"
+    return base / "uvr-local" / "output"
+
+
+def resolve_registry_dir() -> Path:
+    """Pick a writable cache directory for audio-separator registry models.
+
+    Registry downloads default to `<MODEL_STORE>/.registry`. That directory can
+    be left root-owned by a previous Docker run, and the local (non-Docker)
+    worker then fails every registry-backed model with
+    "Permission denied: .../.registry/download_checks.json" — which silently
+    breaks most of the catalog rather than one entry.
+
+    Rather than requiring sudo to fix ownership, walk a list of candidates and
+    use the first one this process can actually write to, warning loudly when
+    the preferred location is unusable. Override with REGISTRY_CACHE_DIR.
+
+    Read at CALL time, not from the import-time constant: callers (tests, the
+    sandbox prober) set MODEL_STORE after this module is already loaded and
+    expect the registry cache to follow it.
+
+    Lives here rather than in backend.py so install-state reporting can see the
+    same cache the loader uses — a registry model whose YAML is on disk is
+    installed, even though it has no `models/<id>/` directory of its own.
+    """
+    store_env = os.environ.get("MODEL_STORE")
+    store = Path(store_env).expanduser() if store_env else MODEL_STORE
+    candidates = [
+        Path(os.environ["REGISTRY_CACHE_DIR"])
+        if os.environ.get("REGISTRY_CACHE_DIR")
+        else store / ".registry",
+        # output-local is host-owned and persistent, so this keeps the cache
+        # across restarts instead of re-downloading into a temp dir.
+        _output_root() / ".registry",
+        Path(tempfile.gettempdir()) / "uvr-registry-cache",
+    ]
+    for i, cand in enumerate(candidates):
+        try:
+            cand.mkdir(parents=True, exist_ok=True)
+            probe = cand / ".write-test"
+            probe.touch()
+            probe.unlink()
+        except OSError as exc:
+            if i == 0:
+                logger.warning(
+                    "Registry cache %s is not writable (%s). Falling back to %s. "
+                    "To fix permanently: chown -R $USER %s",
+                    cand, exc, candidates[min(i + 1, len(candidates) - 1)], cand,
+                )
+            continue
+        return cand
+    raise RuntimeError(
+        "No writable directory for the audio-separator registry cache. "
+        "Set REGISTRY_CACHE_DIR to a path this user can write to."
+    )
 
 CHUNK = 1 << 20  # 1 MiB
 MAX_RETRIES = 3
@@ -119,6 +182,10 @@ class ModelRecord:
     # Name of the equivalent model in audio-separator's own registry. Used as a
     # fallback when we have no direct download spec for this catalog entry.
     registry: Optional[str] = None
+    # Instruments this model can isolate, observed from a real run. Used by the
+    # Instrument Extractor scene so it never offers a target the model cannot
+    # actually emit.
+    instrument_targets: list[str] = field(default_factory=list)
 
     @property
     def downloadable(self) -> bool:
@@ -243,6 +310,7 @@ class ModelManager:
                 ensemble=bool(e.get("ensemble")),
                 unsupported=e.get("unsupported") or None,
                 registry=e.get("registry") or None,
+                instrument_targets=e.get("instrumentTargets", []),
             )
         self._registry = registry
         logger.info("Model registry loaded: %d entries", len(registry))
@@ -289,8 +357,25 @@ class ModelManager:
                 self._states[model_id] = ModelState(model_id)
             return self._states[model_id]
 
+    def registry_cached(self, model_id: str) -> bool:
+        """True when audio-separator's cache already holds this model's YAML.
+
+        Registry-backed models are fetched by audio-separator itself into a
+        shared cache rather than into `models/<id>/`, so `paths()` never
+        describes them. Without this, every registry model reports itself as
+        neither installed nor downloadable, and the UI tells the user a model
+        that demonstrably runs is "not runnable".
+        """
+        rec = self._registry.get(model_id)
+        if rec is None or not rec.registry:
+            return False
+        try:
+            return (resolve_registry_dir() / rec.registry).exists()
+        except Exception:  # pragma: no cover - resolver raises only if nowhere is writable
+            return False
+
     def is_installed(self, model_id: str) -> bool:
-        return self.paths(model_id) is not None
+        return self.paths(model_id) is not None or self.registry_cached(model_id)
 
     def installed_size(self, model_id: str) -> int:
         d = self.model_dir(model_id)
@@ -338,6 +423,9 @@ class ModelManager:
                     "ensemble": rec.ensemble,
                     "unsupported": rec.unsupported,
                     "registry": rec.registry,
+                    # Consumed by the Instrument Extractor scene: a model only
+                    # appears as a candidate for a stem it was observed to emit.
+                    "instrumentTargets": rec.instrument_targets or None,
                     **st,
                 }
             )

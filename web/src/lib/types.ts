@@ -3,7 +3,8 @@ export type SceneKey =
   | "extract-vocals"
   | "karaoke"
   | "stem-splitter"
-  | "denoise"
+  | "instrument-extractor"
+  | "audio-repair"
   | "acapella"
   | "vocal-tools"
   | "production"
@@ -16,9 +17,18 @@ export type ModelTarget =
   | "4-stem"
   | "multi";
 
+/**
+ * Multiplier shown on a model card and used by the Usage filter. Mirrors the
+ * reference site ("1x", "2x", "3x+") rather than the old "1 pass"/"3+ passes"
+ * phrasing, which read as a sentence rather than a cost.
+ */
+export type UsageTier = "1x" | "2x" | "3x+";
+
 export interface Model {
   id: string;
   name: string;
+  /** Compact name for dense grids, e.g. "Becruily Deux". Falls back to `name`. */
+  shortName?: string;
   arch: string;
   target: ModelTarget;
   tags: string[];
@@ -32,8 +42,13 @@ export interface Model {
   description?: string;
   /** Workbench trait shown on the model card (e.g. "Low bleed"). */
   trait?: string;
-  /** Number of model passes this preset runs ("1 pass" or "3+ passes"). */
-  usage?: string;
+  /** Scene sub-filter buckets this model belongs to (e.g. "Center"). */
+  categories?: string[];
+  /**
+   * How many model passes this preset runs, using the reference site's
+   * vocabulary: "1x", "2x" or "3x+". Undefined means a single pass.
+   */
+  usage?: UsageTier;
   favorite?: boolean;
   recommended?: boolean;
   /** Ensemble preset (fuses multiple models). */
@@ -44,6 +59,13 @@ export interface Model {
    * hit a failure they cannot act on.
    */
   unsupported?: string | null;
+  /**
+   * Instrument stems this model has been OBSERVED to emit, used by the
+   * Instrument Extractor scene. Populated from probe output filenames, never
+   * from the checkpoint's advertised capabilities — a model offering "piano"
+   * that never writes a Piano stem must not appear in the piano list.
+   */
+  instrumentTargets?: string[];
 }
 
 export type JobStatus = "queued" | "processing" | "ready" | "error" | "cancelled";
@@ -79,10 +101,42 @@ export interface SceneMeta {
   short: string;
   description: string;
   icon: string;
-  defaultModelId: string;
+  /**
+   * Model preselected when entering the scene. Omitted by repair scenes,
+   * which run ffmpeg DSP and have no model at all.
+   */
+  defaultModelId?: string;
   allowedTargets: ModelTarget[];
   multiStem?: boolean;
+  /**
+   * True when this scene repairs the recording instead of separating it.
+   * Repair scenes show an operation picker and hide the model grid.
+   */
+  repair?: boolean;
+  /**
+   * True when this scene isolates ONE instrument stem from a multi-stem
+   * model. Such scenes show an instrument picker alongside the model grid and
+   * require a target before processing.
+   */
+  instrument?: boolean;
+  /**
+   * Optional categories this scene offers as a sub-filter (the reference's
+   * Vocal Tools "Center / Male-Female" split). When set, the workbench shows
+   * one filter chip per category and keeps only models tagged with it.
+   *
+   * Scenes that declare categories but whose models carry none render an
+   * explicit empty state rather than silently showing nothing.
+   */
+  subFilters?: string[];
 }
+
+/** Model categories usable as a scene sub-filter. */
+export const MODEL_CATEGORIES = [
+  "Center",
+  "Male/Female",
+] as const;
+
+export type ModelCategory = (typeof MODEL_CATEGORIES)[number];
 
 export interface AppState {
   jobs: Job[];
@@ -124,6 +178,10 @@ export interface CreateJobRequest {
     extractInstrumental?: boolean;
     useTTA?: boolean;
     stemSelection?: string[];
+    /** Instrument stem to keep, e.g. "guitar". Instrument Extractor scene. */
+    extractTarget?: string;
+    /** Repair operations to apply in worker order. Audio Repair scene. */
+    repairOps?: string[];
   };
 }
 

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
+import { FeedbackButton } from "@/components/ui/feedback-button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useBackendHealth } from "@/hooks/useBackendHealth";
@@ -47,6 +48,7 @@ export function AppShell({
           <div className="relative">{children}</div>
         </main>
         <Footer />
+        <FeedbackButton />
       </div>
     </TooltipProvider>
   );

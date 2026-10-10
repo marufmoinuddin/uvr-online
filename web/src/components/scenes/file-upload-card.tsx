@@ -47,13 +47,22 @@ const PROCESS_LABEL: Partial<Record<SceneKey, string>> = {
   "extract-vocals": "Extract vocals",
   karaoke: "Make karaoke",
   "stem-splitter": "Split stems",
-  denoise: "Remove noise",
+  "audio-repair": "Repair audio",
   acapella: "Extract acapella",
+  "instrument-extractor": "Extract instrument",
 };
 
 interface FileUploadCardProps {
   scene: SceneKey;
   className?: string;
+  /** Selected repair operations. Present only for repair scenes. */
+  repairOps?: string[];
+  onRepairOpsChange?: (ops: string[]) => void;
+  /**
+   * Instrument stem to keep. Present only for instrument scenes; null/undefined
+   * means the user has not chosen one yet.
+   */
+  extractTarget?: string | null;
 }
 
 /**
@@ -61,14 +70,20 @@ interface FileUploadCardProps {
  * format + model controls, Process audio button and a files counter.
  * Mirrors the reference workbench layout.
  */
-export function FileUploadCard({ scene, className }: FileUploadCardProps) {
+export function FileUploadCard({
+  scene,
+  className,
+  repairOps,
+  onRepairOpsChange,
+  extractTarget,
+}: FileUploadCardProps) {
   const selectedModelId = useStore((s) => s.selectedModelId);
   const addJob = useStore((s) => s.addJob);
   const backendOnline = useStore((s) => s.backendOnline);
   const catalog = useStore((s) => s.modelCatalog);
   const modelCount = React.useMemo(
-    () => modelsForScene(scene, catalog).length,
-    [scene, catalog],
+    () => modelsForScene(scene, catalog, extractTarget ?? null).length,
+    [scene, catalog, extractTarget],
   );
   // Ensemble presets fuse the output of *existing* jobs (2-6 model passes),
   // so they cannot be submitted as a plain single-model separation.
@@ -138,8 +153,26 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const isRepairScene = scene === "audio-repair";
+  const isInstrumentScene = scene === "instrument-extractor";
+  const repairSelection = repairOps ?? [];
+  // A repair with nothing selected would be rejected by the worker anyway;
+  // disable it here so the user finds out before uploading.
+  const needsRepairOps = isRepairScene && repairSelection.length === 0;
+  // Same reasoning: without a target the worker has no stem to keep, so it
+  // would either reject the job or return the wrong one-element list.
+  const needsInstrument = isInstrumentScene && !extractTarget;
+
   const handleProcess = async () => {
-    if (files.length === 0 || submitting || isEnsemble) return;
+    if (
+      files.length === 0 ||
+      submitting ||
+      isEnsemble ||
+      needsRepairOps ||
+      needsInstrument
+    ) {
+      return;
+    }
     setSubmitting(true);
     setUploadPct(0);
     try {
@@ -149,7 +182,14 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
           {
             scene,
             modelId: selectedModelId,
-            options: { outputFormat, extractInstrumental: scene === "vocal-remover" || scene === "karaoke" },
+            options: {
+              outputFormat,
+              extractInstrumental: scene === "vocal-remover" || scene === "karaoke",
+              ...(isRepairScene ? { repairOps: repairSelection } : {}),
+              ...(isInstrumentScene && extractTarget
+                ? { extractTarget }
+                : {}),
+            },
           },
           setUploadPct,
         );
@@ -178,7 +218,14 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-        if (files.length > 0 && !submitting && !isEnsemble && backendOnline !== false) {
+        if (
+          files.length > 0 &&
+          !submitting &&
+          !isEnsemble &&
+          !needsRepairOps &&
+          !needsInstrument &&
+          backendOnline !== false
+        ) {
           e.preventDefault();
           if (files.length > 1) setConfirmBatch(true);
           else handleProcess();
@@ -188,7 +235,7 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [files.length, submitting, isEnsemble, backendOnline]);
+  }, [files.length, submitting, isEnsemble, needsRepairOps, backendOnline]);
 
   const processLabel = PROCESS_LABEL[scene] ?? "Process audio";
   const offline = backendOnline === false;
@@ -365,32 +412,40 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
               </SelectContent>
             </Select>
 
-            {/* Models — every model is open-source and free */}
+            {/* Repairs for the repair scene, models everywhere else. Both jump
+                to the picker below, so the control stays a shortcut. */}
             <a
-              href="#model-selection"
+              href={isRepairScene ? "#repair-selection" : "#model-selection"}
               className="flex h-[72px] w-full flex-col items-start justify-center gap-0.5 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50"
             >
               <span className="flex w-full items-center justify-between">
                 <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Models
+                  {isRepairScene ? "Repairs" : "Models"}
                 </span>
                 <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
               </span>
               <span className="text-sm font-semibold leading-5 text-foreground">
-                {modelCount} available
+                {isRepairScene
+                  ? `${repairSelection.length} selected`
+                  : `${modelCount} available`}
               </span>
               <span className="text-xs leading-4 text-muted-foreground">
-                All open-source
+                {isRepairScene ? "No model needed" : "All open-source"}
               </span>
             </a>
 
-            {/* Selected model cache state */}
-            {selectedStatus && !isEnsemble && (
+            {/* Selected model cache state — meaningless for a repair, which
+                downloads nothing. */}
+            {selectedStatus && !isEnsemble && !isRepairScene && (
               <p className="text-[11px] leading-4 text-muted-foreground">
                 {selectedStatus.installed ? (
                   <>
-                    <span className="text-emerald-400">Cached locally</span>{" "}
-                    · {formatBytes(selectedStatus.sizeBytes)}
+                    <span className="text-emerald-400">Cached locally</span>
+                    {/* Registry models live in audio-separator's shared cache,
+                        where the per-model byte count is not knowable. */}
+                    {selectedStatus.sizeBytes > 0 && (
+                      <> · {formatBytes(selectedStatus.sizeBytes)}</>
+                    )}
                   </>
                 ) : selectedStatus.download?.status === "downloading" ? (
                   <span className="text-indigo-300">
@@ -418,13 +473,22 @@ export function FileUploadCard({ scene, className }: FileUploadCardProps) {
                 if (files.length > 1) setConfirmBatch(true);
                 else handleProcess();
               }}
-              disabled={files.length === 0 || submitting || isEnsemble || offline}
+              disabled={
+                files.length === 0 ||
+                submitting ||
+                isEnsemble ||
+                offline ||
+                needsRepairOps ||
+                needsInstrument
+              }
               title={
                 offline
                   ? "The processing service is offline — jobs cannot be submitted until it comes back."
                   : isEnsemble
                     ? "Ensemble presets fuse the results of existing jobs — run 2 or more separations first, then use the Ensemble builder on the Explore page."
-                    : undefined
+                    : needsInstrument
+                      ? "Choose an instrument to extract first."
+                      : undefined
               }
               className={cn(
                 "flex h-11 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50",

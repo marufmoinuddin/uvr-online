@@ -17,34 +17,30 @@ export interface ComparisonEntry {
 }
 
 interface ComparisonPlayerProps {
-  entries: ComparisonEntry[];
-  /** Models selected via ?compare= on the explore page (no stems yet). */
+  /** Models selected via ?compare= on the explore page. */
   models?: Model[];
   className?: string;
 }
 
 /**
- * A/B comparison — loads 2–4 models side-by-side with synced playback
- * (all players share a sync group) and a waveform overlay.
+ * A/B comparison — runs 2–4 models over ONE file and plays the results
+ * side-by-side on a shared sync group.
  *
- * When models are selected but no stems exist yet, shows the selected
- * models with a "Run" action so the flow is never a dead end.
+ * The runner below is the only data path. An earlier version also accepted a
+ * pre-built `entries` prop, but the sole call site passed `entries={[]}`, so
+ * that branch and the synced-playback view behind it were unreachable. Rather
+ * than keep a second contract "for later", the prop is gone; a future caller
+ * that has stems in hand can introduce an explicit interface when it exists.
  */
 export function ComparisonPlayer({
-  entries,
   models = [],
   className,
 }: ComparisonPlayerProps) {
   const [group] = React.useState(
     () => `compare-${Math.random().toString(36).slice(2)}`,
   );
-  const count = entries.length || models.length;
+  const count = models.length;
 
-  // Real comparison: run the selected models over ONE file so the results are
-  // actually comparable. Previously this panel only ever rendered the
-  // "run them" placeholder and its button linked away to the workbench, so
-  // `entries` was permanently empty and the synced-playback view below was
-  // unreachable — the feature was a dead end.
   const { jobs } = useJobs();
   const [file, setFile] = React.useState<File | null>(null);
   const [running, setRunning] = React.useState(false);
@@ -110,7 +106,7 @@ export function ComparisonPlayer({
           stems: job.resultStems,
         }];
       })
-    : entries;
+    : [];
 
   const allDone =
     jobIds.length > 0 &&
@@ -127,13 +123,11 @@ export function ComparisonPlayer({
         <GitCompareArrows className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-semibold">A/B comparison</h3>
         <span className="text-xs text-muted-foreground">
-          {entries.length > 0 && !jobIds.length
-            ? "Playback is synchronized across all models"
-            : jobIds.length
-              ? allDone
-                ? "Playback is synchronized across all models"
-                : "Each model runs in turn — results appear as they finish"
-              : `${count} model${count > 1 ? "s" : ""} selected`}
+          {jobIds.length
+            ? allDone
+              ? "Playback is synchronized across all models"
+              : "Each model runs in turn — results appear as they finish"
+            : `${count} model${count > 1 ? "s" : ""} selected`}
         </span>
       </div>
 
@@ -184,24 +178,7 @@ export function ComparisonPlayer({
           count >= 4 && "sm:grid-cols-2 lg:grid-cols-4",
         )}
       >
-        {entries.length > 0
-          ? entries.map((entry) => (
-              <div key={entry.id} className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">
-                  {entry.label}
-                </p>
-                {entry.stems.map((stem, i) => (
-                  <StemPlayer
-                    key={stem.name}
-                    name={stem.name}
-                    url={stem.url}
-                    group={group}
-                    color={["#6366f1", "#8b5cf6", "#ec4899", "#10b981"][i % 4]}
-                  />
-                ))}
-              </div>
-            ))
-          : models.map((m) => {
+        {models.map((m) => {
               const job = jobs.find((j) => j.modelId === m.id && jobIds.includes(j.id));
               const state = job?.status;
               const failed = state === "error" || state === "cancelled";

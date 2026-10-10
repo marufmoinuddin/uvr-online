@@ -33,6 +33,14 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const menuToggleRef = React.useRef<HTMLButtonElement>(null);
 
+  // Read ONCE at the top level. These were previously called inline inside a
+  // ternary in the status badge, which is a conditional hook call — the exact
+  // thing the rules-of-hooks lint error exists to catch.
+  const backendOnline = useStore((s) => s.backendOnline);
+  const device = useStore((s) => s.device);
+  const onCpu = device === "cpu";
+  const online = backendOnline !== false;
+
   // Close mobile menu on Escape and restore focus to the toggle.
   React.useEffect(() => {
     if (!mobileOpen) return;
@@ -98,17 +106,25 @@ export function Header() {
                       <span
                         className={cn(
                           "h-1.5 w-1.5 rounded-full",
-                          useStore((s) => s.backendOnline) !== false
-                            ? "bg-emerald-500"
+                          online
+                            ? // Amber, not green: the worker is up, but model
+                              // separation runs on the CPU and is far too slow
+                              // to be practical. A green dot here would promise
+                              // a speed the user will never get.
+                              onCpu
+                              ? "bg-amber-400"
+                              : "bg-emerald-500"
                             : "bg-red-500",
                         )}
                       />
-                      Unlimited · local
+                      {onCpu ? "Unlimited · local · CPU" : "Unlimited · local"}
                     </span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  Runs entirely on your own GPU — no accounts, no credits, no limits.
+                  {onCpu
+                    ? "No usable GPU detected. Audio Repair still works normally (it is CPU-only by design), but model separation runs on the CPU and is impractically slow — a few seconds of audio can take hours."
+                    : "Runs entirely on your own GPU — no accounts, no credits, no limits."}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

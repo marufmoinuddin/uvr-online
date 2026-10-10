@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
+import torch
+
 from backend import separate_file
 from repair_workflow import execute_repair_job
 from model_manager import manager as model_manager
@@ -51,10 +53,17 @@ class Job:
     model_id: str
     file_name: str
     status: str = "queued"  # queued | processing | ready | error | cancelled
-    stage: str = "queued"  # queued | uploading | gpu | assemble | done
+    stage: str = "queued"  # queued | uploading | gpu | cpu | assemble | done
     progress: float = 0.0
     eta_sec: Optional[float] = None
+    # Which device actually ran this job. CPU separation works but is
+    # impractically slow (measured >40min for a 5s clip vs 8.8s on GPU), so the
+    # UI needs to say so rather than imply everything ran on the GPU.
+    device: str = ""
     created_at: float = field(default_factory=time.time)
+    # Set when the job leaves the queue, so the ETA can be derived from the
+    # rate actually observed instead of a hardcoded guess.
+    started_at: Optional[float] = None
     result_stems: list[dict[str, Any]] = field(default_factory=list)
     download_urls: list[str] = field(default_factory=list)
     error: Optional[str] = None
@@ -62,6 +71,10 @@ class Job:
     output_dir: Optional[str] = None
     options: dict[str, Any] = field(default_factory=dict)
     cancelled: bool = False
+
+    def _elapsed(self) -> float:
+        """Seconds since this job started running, for the ETA calculation."""
+        return (time.time() - self.started_at) if self.started_at else 0.0
     # "separate" runs a model; "repair" runs ffmpeg DSP and produces a single
     # corrected file. Jobs persisted before this field existed are separations,
     # which is what the default has to be.
@@ -78,6 +91,7 @@ class Job:
             "progress": round(self.progress, 1),
             "stage": self.stage,
             "etaSec": self.eta_sec,
+            "device": self.device,
             "createdAt": int(self.created_at * 1000),
             "resultStems": self.result_stems,
             "downloadUrls": self.download_urls,
@@ -327,10 +341,21 @@ class JobQueue:
         if job.cancelled:
             return
         job.status = "processing"
-        # Repair is ffmpeg DSP and never touches the GPU, so labelling it "GPU
-        # inference" would be a lie in the progress readout.
-        job.stage = "assemble" if job.kind == "repair" else "gpu"
-        job.eta_sec = 30.0 if job.kind == "separate" else 5.0
+        # Repair is ffmpeg DSP and never touches the GPU; separation runs on
+        # CUDA when there is one and on CPU otherwise. Labelling either as
+        # "GPU inference" is simply false, and the stage is the only place the
+        # user learns which device they are actually burning.
+        on_gpu = torch.cuda.is_available()
+        if job.kind == "repair":
+            job.stage = "assemble"
+        else:
+            job.stage = "gpu" if on_gpu else "cpu"
+        # A fixed 30s guess is wrong by orders of magnitude on CPU (measured:
+        # >40min for a 5s clip). Start with no estimate and let _on_progress
+        # derive one from the observed rate instead of inventing one.
+        job.eta_sec = 5.0 if job.kind == "repair" else None
+        job.device = "cuda" if on_gpu else "cpu"
+        job.started_at = time.time()
         await self._broadcast(job)
         try:
             if job.kind == "repair":
@@ -417,7 +442,14 @@ class JobQueue:
     def _on_progress(self, job: Job, pct: float, stage: str) -> None:
         job.progress = pct
         if stage:
-            job.stage = "gpu"
+            # Keep the stage honest as phases change; never claim GPU on CPU.
+            job.stage = "gpu" if torch.cuda.is_available() else "cpu"
+        # Derive the ETA from the rate actually observed, never from a
+        # constant. Until enough progress has accumulated to be meaningful the
+        # UI shows "estimating…" rather than a number that means nothing.
+        if pct >= 0.02:
+            rate = pct / max(job._elapsed(), 1e-6)  # fraction per second
+            job.eta_sec = round(max(0.0, (1.0 - pct) / rate), 1) if rate > 0 else None
         loop = self._loop or asyncio.get_event_loop()
         loop.call_soon_threadsafe(
             lambda: asyncio.create_task(self._broadcast(job))

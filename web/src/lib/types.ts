@@ -104,7 +104,16 @@ export interface Model {
 
 export type JobStatus = "queued" | "processing" | "ready" | "error" | "cancelled";
 
-export type JobStage = "queued" | "uploading" | "gpu" | "assemble" | "done";
+// "cpu" exists so a job on a machine without a usable GPU never renders as
+// "GPU inference". Separation does run on CPU — it is just impractically slow
+// (measured >40min for a 5s clip against 8.8s on the GPU).
+export type JobStage =
+  | "queued"
+  | "uploading"
+  | "gpu"
+  | "cpu"
+  | "assemble"
+  | "done";
 
 export interface JobStem {
   name: string;
@@ -122,6 +131,8 @@ export interface Job {
   progress: number; // 0-100
   stage: JobStage;
   etaSec?: number;
+  /** Device the job actually ran on: "cuda" | "cpu" | "" . */
+  device?: string;
   createdAt: number;
   resultStems?: JobStem[];
   downloadUrls?: string[];

@@ -12,6 +12,7 @@ import { useStore } from "@/lib/store";
  */
 export function useBackendHealth() {
   const setBackendOnline = useStore((s) => s.setBackendOnline);
+  const setDevice = useStore((s) => s.setDevice);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,10 +25,17 @@ export function useBackendHealth() {
         const res = await fetch("/api/health", { cache: "no-store" });
         const data = (await res.json().catch(() => ({}))) as {
           error?: string;
+          device?: string;
         };
         // The proxy returns 200 with `error: "worker unreachable"` when the
         // worker is down, so a truthy `error` means offline.
         online = res.ok && !data.error;
+        // Capture which device the worker is actually using. The health
+        // endpoint has always reported this and nothing ever read it, so a
+        // CPU-only install looked identical to a GPU one.
+        if (online && data.device) {
+          setDevice(data.device.startsWith("cuda") ? "cuda" : "cpu");
+        }
       } catch {
         online = false;
       }
@@ -44,5 +52,5 @@ export function useBackendHealth() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [setBackendOnline]);
+  }, [setBackendOnline, setDevice]);
 }

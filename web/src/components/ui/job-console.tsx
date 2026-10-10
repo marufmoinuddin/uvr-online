@@ -56,6 +56,7 @@ const STAGE_LABELS: Record<Job["stage"], string> = {
   queued: "Queued",
   uploading: "Uploading",
   gpu: "GPU inference",
+  cpu: "CPU inference",
   assemble: "Assembling",
   done: "Done",
 };
@@ -64,6 +65,7 @@ const STAGE_ICONS: Record<Job["stage"], React.ReactNode> = {
   queued: <Clock className="h-3.5 w-3.5" />,
   uploading: <Upload className="h-3.5 w-3.5" />,
   gpu: <Cpu className="h-3.5 w-3.5" />,
+  cpu: <Cpu className="h-3.5 w-3.5" />,
   assemble: <Package className="h-3.5 w-3.5" />,
   done: <CheckCircle2 className="h-3.5 w-3.5" />,
 };
@@ -187,8 +189,13 @@ function JobCard({
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {STAGE_ICONS[job.stage]}
             <span>{STAGE_LABELS[job.stage]}</span>
-            {job.etaSec != null && job.status === "processing" && (
-              <span className="ml-auto">ETA {formatEta(job.etaSec)}</span>
+            {job.status === "processing" && (
+              // No ETA is published until enough progress has accumulated to
+              // estimate one from the observed rate. Showing a placeholder
+              // beats showing a number that means nothing.
+              <span className="ml-auto">
+                ETA {job.etaSec != null ? formatEta(job.etaSec) : "estimating…"}
+              </span>
             )}
           </div>
           <Progress value={job.progress} />

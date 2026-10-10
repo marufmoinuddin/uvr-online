@@ -17,6 +17,12 @@ interface Store {
   favorites: string[];
   /** Whether the local GPU worker is reachable (null = not checked yet). */
   backendOnline: boolean | null;
+  /**
+   * Device the worker actually runs separation on ("cuda" | "cpu").
+   * Empty until the first health response. Separation does run on CPU — it is
+   * just impractically slow — so this is reported honestly rather than hidden.
+   */
+  device: "" | "cuda" | "cpu";
 
   setModelCatalog: (models: Model[]) => void;
   selectModel: (id: string) => void;
@@ -24,6 +30,7 @@ interface Store {
   setTheme: (theme: "light" | "dark" | "system") => void;
   toggleFavorite: (id: string) => void;
   setBackendOnline: (online: boolean) => void;
+  setDevice: (device: "cuda" | "cpu") => void;
   addJob: (job: Job) => void;
   upsertJob: (job: Job) => void;
   syncJobs: (jobs: Job[]) => void;
@@ -43,12 +50,14 @@ export const useStore = create<Store>()(
       theme: "system",
       favorites: [],
       backendOnline: null,
+      device: "" as const,
 
       setModelCatalog: (modelCatalog) => set({ modelCatalog }),
       selectModel: (selectedModelId) => set({ selectedModelId }),
       setScene: (scene) => set({ scene }),
       setTheme: (theme) => set({ theme }),
       setBackendOnline: (backendOnline) => set({ backendOnline }),
+      setDevice: (device) => set({ device }),
       toggleFavorite: (id) =>
         set({
           favorites: get().favorites.includes(id)

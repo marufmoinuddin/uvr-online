@@ -18,6 +18,7 @@ import re
 import shutil
 import sys
 import tempfile
+import threading
 import time
 
 import yaml
@@ -338,6 +339,23 @@ def _checkpoint_needs_hyperace(model_path: str) -> bool:
     return any("hyperace" in str(k).lower() for k in sd.keys())
 
 
+def _using_cuda() -> bool:
+    """Is a CUDA device actually available right now?
+
+    A helper rather than a bare `torch.cuda.is_available()` because torch is
+    imported function-locally throughout this module (to keep import cost off
+    the DSP-only repair path), so a bare reference at module scope raises
+    `NameError: cannot access local variable 'torch'`. Every device decision
+    goes through here so there is one answer, not several.
+    """
+    import torch
+
+    try:
+        return bool(torch.cuda.is_available())
+    except Exception:  # pragma: no cover - driver/runtime mismatch
+        return False
+
+
 def _separate_with_msst(
     model_id: str,
     config_path: str,
@@ -420,11 +438,48 @@ def _separate_with_msst(
         mix = (mix - mean) / (std + 1e-8)
         norm_params = {"mean": mean, "std": std}
 
-    progress(20, "Running GPU inference")
+    on_gpu = device == "cuda"
+    where = "GPU" if on_gpu else "CPU"
+    progress(20, f"Running inference on {where}")
+    # `demix()` already reports per-chunk completion into `callback["progress"]`.
+    # We were never passing one, so the bar sat at 20% for the entire run — on
+    # CPU that reads as a bar that has hung. Report the real thing instead.
+    cb: dict[str, float] = {}
     started = time.time()
-    with torch.no_grad():
-        waveforms = demix(config, model, mix, device, model_type=model_type)
-    logger.info("MSST separation took %.1fs for %s", time.time() - started, model_id)
+    done = threading.Event()
+    holder: dict[str, Any] = {}
+
+    def run() -> None:
+        try:
+            holder["out"] = demix(
+                config, model, mix, device,
+                model_type=model_type, callback=cb,
+            )
+        except BaseException as exc:  # surfaced on the main thread below
+            holder["err"] = exc
+        finally:
+            done.set()
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    while not done.is_set():
+        frac = float(cb.get("progress", 0.0))
+        if frac > 0:
+            # Hold back the last 5% for post-processing so the bar never
+            # claims 100% before the stems exist on disk.
+            progress(20 + frac * 75, f"Running inference on {where}")
+        done.wait(0.5)
+    t.join(timeout=5.0)
+
+    if "err" in holder:
+        raise holder["err"]
+    waveforms = holder.get("out")
+    if waveforms is None:
+        raise RuntimeError("Inference produced no audio.")
+    logger.info(
+        "MSST separation took %.1fs for %s on %s",
+        time.time() - started, model_id, device,
+    )
 
     target = config.training.target_instrument
     instruments = [target] if target else list(config.training.instruments)
@@ -602,10 +657,18 @@ class _AudioSeparatorBackend:
             sep = self._cls(model_file_dir=str(registry_dir), **sep_kwargs)
             sep.load_model(model_filename=registry_name)
 
-        progress(10, "Running GPU inference")
+        # audio-separator exposes no per-chunk inference callback, so we cannot
+        # report a percentage here the way the MSST path does. Say what is
+        # actually true — which device is working, and that it is running —
+        # instead of asserting "GPU" on a machine with no GPU.
+        sep_device = "GPU" if _using_cuda() else "CPU"
+        progress(10, f"Running inference on {sep_device}")
         start = time.time()
         produced = sep.separate(input_path)
-        logger.info("Separation took %.1fs for %s", time.time() - start, model_id)
+        logger.info(
+            "Separation took %.1fs for %s on %s",
+            time.time() - start, model_id, sep_device.lower(),
+        )
 
         stems: list[dict[str, Any]] = []
         files = produced if isinstance(produced, (list, tuple)) else []

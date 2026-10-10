@@ -40,7 +40,7 @@ export default function ExplorePage({
       </div>
       <ModelManager />
       <ModelMatrix models={MODEL_CATALOG} />
-      <ComparisonPlayer entries={[]} models={compareModels} />
+      <ComparisonPlayer models={compareModels} />
     </div>
   );
 }

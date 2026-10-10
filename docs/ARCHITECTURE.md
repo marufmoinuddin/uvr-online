@@ -118,3 +118,49 @@ checkpoint would kill the uvicorn process and take the whole API down.
 `POST /ensemble` loads the stems of 2–6 ready jobs, aligns them, and fuses in
 the frequency domain (`avg_fft`, `median_fft`, `max_fft`, `min_fft` — STFT with
 overlap-add) or time domain (`avg_wave`, `median_wave`). Weights are normalized.
+---
+
+## Verification gate — process ownership
+
+`scripts/verify-all.sh` must never stop a process it did not start.
+
+Historically it did. The frontend stage ran
+`pkill -f 'next dev|next-server|next start'` so its build could not collide with
+a running server, because `next build` and a running server share the `.next`
+directory. The visible symptom was a **production server on :3000 dying every
+time the gate ran** — the gate terminated the application, it did not leave a
+stale one behind. (`next build` was blamed; the `pkill` in the old
+`verify-web.sh` was the actual cause.)
+
+The fix is isolation rather than killing:
+
+| | Application | Verification |
+|---|---|---|
+| Build directory | `.next` | `.next-verify` (`UVR_NEXT_DIST_DIR`) |
+| Port | 3000 | 3100 (`UVR_VERIFY_PORT`) |
+| Shutdown | operator | the gate's own process group only |
+
+`scripts/verify-web.sh` registers `EXIT`/`INT`/`TERM` traps **before** starting
+anything, starts the temporary server under `setsid` so it has its own process
+group, and signals that group on the way out. `cleanup()` preserves `$?` so a
+failing gate cannot be turned green by its own teardown. A listener already on
+the verification port is reported as a failure, never killed.
+
+`scripts/test-gate-lifecycle.sh` (gate stage 2) asserts all of this: success and
+failure both release the port, SIGINT/SIGTERM release it, an app on :3000 keeps
+its exact PID across a full gate run, a squatter on :3100 is reported not killed,
+and the exit code survives cleanup.
+
+### Consequence: the gate no longer refreshes the app build
+
+Because verification builds into `.next-verify`, running `./scripts/verify-all.sh`
+no longer updates `.next`. That is the point — the gate must not touch the
+application's build — but it means a green gate does **not** mean the server on
+:3000 is serving your latest frontend code.
+
+```bash
+# after changing web/ and before testing by hand:
+cd web && ./node_modules/.bin/next build && <restart next start>
+```
+
+`scripts/start-web.sh` should grow a build step so this cannot be forgotten.

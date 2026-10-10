@@ -16,27 +16,33 @@ const config: Config = {
           DEFAULT: "rgb(var(--muted) / <alpha-value>)",
           foreground: "rgb(var(--muted-fg) / <alpha-value>)",
         },
-        border: "rgb(var(--border) / <alpha-value>)",
-        input: "rgb(var(--control-border) / <alpha-value>)",
+        // NOTE: tokens whose value already carries its own alpha (e.g.
+        // `255 255 255 / 0.05`) MUST NOT use `<alpha-value>`. Substituting
+        // produces `rgb(255 255 255 / 0.05 / 1)`, which is invalid CSS, so
+        // the declaration is dropped and the element falls back to an opaque
+        // colour. That silently turned every `border-border` in the app into a
+        // solid white hairline instead of white/5.
+        border: "rgb(var(--border))",
+        input: "rgb(var(--control-border))",
         ring: "rgb(var(--primary) / <alpha-value>)",
         primary: {
           DEFAULT: "rgb(var(--primary) / <alpha-value>)",
           foreground: "rgb(var(--primary-fg) / <alpha-value>)",
           hover: "rgb(var(--primary-hover) / <alpha-value>)",
-          glow: "rgb(var(--primary-glow) / <alpha-value>)",
+          glow: "rgb(var(--primary-glow))",
         },
         card: {
-          DEFAULT: "rgb(var(--card) / <alpha-value>)",
+          DEFAULT: "rgb(var(--card))",
           foreground: "rgb(var(--fg) / <alpha-value>)",
-          border: "rgb(var(--card-border) / <alpha-value>)",
+          border: "rgb(var(--card-border))",
         },
         control: {
-          DEFAULT: "rgb(var(--control-bg) / <alpha-value>)",
-          border: "rgb(var(--control-border) / <alpha-value>)",
+          DEFAULT: "rgb(var(--control-bg))",
+          border: "rgb(var(--control-border))",
         },
         glass: {
-          DEFAULT: "rgb(var(--glass-bg) / <alpha-value>)",
-          border: "rgb(var(--glass-border) / <alpha-value>)",
+          DEFAULT: "rgb(var(--glass-bg))",
+          border: "rgb(var(--glass-border))",
         },
       },
       borderRadius: {

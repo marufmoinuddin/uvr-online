@@ -441,6 +441,12 @@ const BASE_MODELS: Model[] = [
     stems: ["crowd", "other"],
     categories: ["Crowd"],
     source: "audio-separator model registry",
+    repair: {
+      categories: ["live-cleanup"],
+      primaryStem: "Other",
+      inputScope: "full-mix",
+      preservesChannels: true,
+    },
   },
 
   // Registry-backed models verified by probe (scripts/probe-registry-model.py)
@@ -480,6 +486,12 @@ const BASE_MODELS: Model[] = [
     sizeMB: 870,
     stems: ["bleed", "instrumental"],
     source: "audio-separator model registry",
+    repair: {
+      categories: ["denoise"],
+      primaryStem: "Instrumental",
+      inputScope: "full-mix",
+      preservesChannels: true,
+    },
   },
   {
     id: "mbr_metal_mesk",
@@ -567,6 +579,12 @@ const BASE_MODELS: Model[] = [
     stems: ["dry", "No dry"],
     categories: ["Dereverb"],
     source: "audio-separator model registry",
+    repair: {
+      categories: ["dereverb"],
+      primaryStem: "Dry",
+      inputScope: "full-mix",
+      preservesChannels: true,
+    },
   },
 ];
 

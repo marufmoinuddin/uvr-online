@@ -52,6 +52,7 @@ from backend import list_models
 from job_queue import OUTPUT_ROOT, UPLOAD_ROOT, Job, queue
 from model_manager import manager as model_manager
 import repair
+import repair_workflow
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("uvr.main")
@@ -187,6 +188,86 @@ async def repair_ops() -> dict:
     return {"ops": repair.list_ops(), "formats": sorted(repair.SUPPORTED_FORMATS)}
 
 
+# The reference site labels its repair facets "Denoise", "Dereverb", "Live
+# cleanup" and "Enhance". Ours map onto the first three; nothing in the
+# catalogue can restore codec artefacts yet, so `enhance` is simply absent
+# rather than offered and then failing.
+REPAIR_CATEGORY_LABELS = {
+    "denoise": "Denoise",
+    "dereverb": "Dereverb",
+    "live-cleanup": "Live cleanup",
+    "enhance": "Enhance",
+}
+
+
+@api.get("/repair/capabilities")
+async def repair_capabilities() -> dict:
+    """Everything the Audio Repair scene may offer, derived from the worker.
+
+    Eligibility is explicit capability metadata, never the model's `target`:
+    a model being `dual` or `instrumental` says nothing about whether it
+    performs a repair, and widening `target` would expose every separation
+    model in the catalogue on a page that promises to repair something.
+
+        eligible = not unsupported
+                   and has a verified fetch path
+                   and declares `repair`
+
+    Facets and their counts are derived from that same list, so a category can
+    never be shown with a count of zero, and a model can never be selected that
+    the worker would refuse.
+    """
+    models: list[dict] = []
+    for m in model_manager.all():
+        if m.unsupported or not m.repair:
+            continue
+        if not (m.registry or (m.download and m.download.files)):
+            continue
+        models.append({
+            "id": m.id,
+            "name": m.name,
+            "shortName": m.name,
+            "arch": m.arch,
+            "categories": m.repair_categories,
+            "primaryStem": m.repair_primary_stem,
+            "inputScope": m.repair.get("inputScope"),
+            "preservesChannels": bool(m.repair.get("preservesChannels")),
+            "requiresGpu": True,
+            # The picker shows a friendlier label than the raw stem name:
+            # MDX De-Reverb's repaired output is literally called "Dry", and
+            # the crowd model's is "Other", which reads as an error in a UI.
+            "outputLabel": REPAIR_OUTPUT_LABELS.get(m.id, "Repaired"),
+        })
+
+    by_category: dict[str, list[str]] = {}
+    for m in models:
+        for c in m["categories"]:
+            by_category.setdefault(c, []).append(m["id"])
+
+    return {
+        "operations": [
+            {"id": op["key"], "label": op["label"],
+             "description": op["description"], "requiresGpu": False}
+            for op in repair.list_ops()
+        ],
+        "models": models,
+        "categories": [
+            {"key": k, "label": REPAIR_CATEGORY_LABELS.get(k, k.title()),
+             "models": sorted(v)}
+            for k, v in sorted(by_category.items())
+        ],
+        "formats": sorted(repair.SUPPORTED_FORMATS),
+    }
+
+
+# What the result is called in the UI, as opposed to the stem filename.
+REPAIR_OUTPUT_LABELS = {
+    "mbr_bleed_suppressor": "De-bleeded instrumental",
+    "mdx_dereverb": "De-reverbed",
+    "mbr_crowd": "Crowd removed",
+}
+
+
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
@@ -301,23 +382,45 @@ async def create_job(
     if not isinstance(opts, dict):
         raise HTTPException(400, "'options' must be a JSON object")
 
-    # Repair is a separate pipeline (ffmpeg DSP, not a model). It is selected
-    # by the scene rather than a flag so the client cannot ask for one while
-    # sending the other's parameters.
+    # Repair is a separate pipeline (ffmpeg DSP, an optional neural model, or
+    # both). It is selected by the scene rather than a flag so the client cannot
+    # ask for one while sending the other's parameters.
     kind = "repair" if scene in REPAIR_SCENES else "separate"
 
     if kind == "repair":
-        # Validate the requested repairs up front. Silently dropping an unknown
+        # Validate the whole plan up front — including the neural model's
+        # capability — before a byte is uploaded. Silently dropping an unknown
         # op would return a file that still has the defect the user was trying
-        # to remove.
+        # to remove, and running a model that cannot produce its declared output
+        # wastes a GPU minute to fail at the very end.
+        repair_model = opts.get("repairModel") or None
+        primary_stem = None
+        if repair_model:
+            rec = model_manager.get(repair_model)
+            if rec is None:
+                raise HTTPException(400, f"Unknown repair model '{repair_model}'.")
+            if rec.unsupported:
+                raise HTTPException(400, f"'{rec.name}' cannot be used: {rec.unsupported}")
+            if not rec.repair:
+                raise HTTPException(
+                    400,
+                    f"'{rec.name}' is a separation model, not a repair model, so "
+                    "it cannot be used on the Audio Repair page.",
+                )
+            primary_stem = rec.repair_primary_stem
         try:
-            repair_ops = repair.resolve_ops(opts.get("repairOps"))
-        except repair.RepairError as exc:
+            plan = repair_workflow.build_plan(
+                opts.get("repairOps") or [],
+                repair_model,
+                primary_stem,
+                opts.get("outputFormat", "wav"),
+            )
+        except repair_workflow.RepairPlanError as exc:
             raise HTTPException(400, str(exc)) from exc
-        opts["repairOps"] = repair_ops
-        # A repair has no model, but the column is NOT NULL in the job record
-        # and "Re-run" re-submits with it.
-        model_id = REPAIR_MODEL_ID
+        opts["repairPlan"] = plan
+        # A pure-DSP repair has no model, but the column is NOT NULL in the job
+        # record and "Re-run" re-submits with it.
+        model_id = repair_model or REPAIR_MODEL_ID
     else:
         # Reject a model that cannot possibly run BEFORE writing the upload to
         # disk. Previously an unknown or unsupported id was accepted, and the

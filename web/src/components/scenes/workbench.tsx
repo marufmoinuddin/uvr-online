@@ -8,6 +8,7 @@ import { ModelSelectionCard } from "@/components/scenes/model-selection-card";
 import { ResultsCard } from "@/components/scenes/results-card";
 import { RepairPicker, type RepairOp } from "@/components/scenes/repair-picker";
 import { fetchRepairOps } from "@/lib/repair-api";
+import { fetchRepairCapabilities } from "@/lib/repair-capabilities-api";
 import {
   InstrumentPicker,
   type InstrumentTarget,
@@ -157,6 +158,38 @@ export function Workbench({
     };
   }, [isRepair]);
 
+  // Neural repair model chosen for this job, or null for fix-ups only.
+  const [repairModel, setRepairModel] = React.useState<string | null>(null);
+  const [repairCaps, setRepairCaps] = React.useState<Awaited<ReturnType<typeof fetchRepairCapabilities>> | null>(null);
+  const [repairCapsError, setRepairCapsError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!isRepair) return;
+    let cancelled = false;
+    fetchRepairCapabilities()
+      .then((caps) => {
+        if (cancelled) return;
+        setRepairCaps(caps);
+        // A model the catalogue used to offer may be gone; do not keep a stale
+        // selection that the worker would now reject.
+        setRepairModel((prev) =>
+          prev && caps.models.some((m) => m.id === prev) ? prev : null,
+        );
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) {
+          setRepairCapsError(
+            e instanceof Error
+              ? `Could not load repair models: ${e.message}`
+              : "Could not load repair models.",
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isRepair]);
+
   const toggleRepairOp = React.useCallback((key: string) => {
     setRepairOps((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
@@ -167,7 +200,7 @@ export function Workbench({
     <div className="mx-auto flex w-full max-w-[1400px] items-start gap-6 px-4 py-6 sm:px-8">
       <WorkbenchSidebar
         active={scene}
-        className="sticky top-[97px] hidden max-h-[calc(100dvh-7rem)] shrink-0 overflow-y-auto lg:flex"
+        className="scroll-subtle sticky top-[97px] hidden max-h-[calc(100dvh-7rem)] shrink-0 overflow-y-auto pb-2 lg:flex"
       />
 
       <section id="workbench-main" className="min-w-0 flex-1" aria-label="Workbench">
@@ -206,6 +239,7 @@ export function Workbench({
             scene={scene}
             repairOps={isRepair ? repairOps : undefined}
             onRepairOpsChange={isRepair ? setRepairOps : undefined}
+            repairModel={isRepair ? repairModel : null}
             extractTarget={isInstrument ? extractTarget : undefined}
           />
           {/* Instrument extraction still runs a model, so its picker sits
@@ -227,8 +261,12 @@ export function Workbench({
               ops={repairOpList}
               selected={repairOps}
               onToggle={toggleRepairOp}
+              models={repairCaps?.models ?? []}
+              categories={repairCaps?.categories ?? []}
+              selectedModel={repairModel}
+              onSelectModel={setRepairModel}
               loading={repairOpsLoading}
-              error={repairOpsError}
+              error={repairOpsError ?? repairCapsError}
             />
           ) : (
             <ModelSelectionCard

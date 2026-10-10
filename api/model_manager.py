@@ -186,6 +186,23 @@ class ModelRecord:
     # Instrument Extractor scene so it never offers a target the model cannot
     # actually emit.
     instrument_targets: list[str] = field(default_factory=list)
+    # Explicit repair capability. Deliberately NOT derived from `target`: being
+    # `dual` or `instrumental` says nothing about whether a model repairs. The
+    # Audio Repair scene filters on this field, so it can never offer a
+    # separation model that cannot actually perform a repair.
+    #
+    # primaryStem is measured by scripts/test-repair-models.py, which scores
+    # every output against a known-clean reference. It is never outputs[0].
+    repair: Optional[dict[str, Any]] = None
+
+    @property
+    def repair_categories(self) -> list[str]:
+        return list((self.repair or {}).get("categories") or [])
+
+    @property
+    def repair_primary_stem(self) -> Optional[str]:
+        stem = (self.repair or {}).get("primaryStem")
+        return str(stem) if stem else None
 
     @property
     def downloadable(self) -> bool:
@@ -311,6 +328,7 @@ class ModelManager:
                 unsupported=e.get("unsupported") or None,
                 registry=e.get("registry") or None,
                 instrument_targets=e.get("instrumentTargets", []),
+                repair=e.get("repair") or None,
             )
         self._registry = registry
         logger.info("Model registry loaded: %d entries", len(registry))
@@ -426,6 +444,8 @@ class ModelManager:
                     # Consumed by the Instrument Extractor scene: a model only
                     # appears as a candidate for a stem it was observed to emit.
                     "instrumentTargets": rec.instrument_targets or None,
+                    # Consumed by the Audio Repair scene's eligibility rule.
+                    "repair": rec.repair,
                     **st,
                 }
             )

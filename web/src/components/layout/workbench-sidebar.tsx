@@ -94,7 +94,7 @@ export function WorkbenchSidebar({
   return (
     <aside
       className={cn(
-        "flex w-[232px] flex-col gap-4 rounded-2xl border border-white/10 bg-[#0F1116] p-3",
+        "flex w-[248px] shrink-0 flex-col gap-2 rounded-2xl border border-white/10 bg-[#0F1116] p-3",
         className,
       )}
     >
@@ -103,9 +103,9 @@ export function WorkbenchSidebar({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="flex h-11 w-full items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-1 pr-2 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50"
+            className="flex h-10 w-full items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-1 pr-2 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50"
           >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-300">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-300">
               <AudioWaveform className="h-4 w-4" />
             </span>
             <span className="min-w-0 flex-1">
@@ -139,10 +139,10 @@ export function WorkbenchSidebar({
       </DropdownMenu>
 
       {/* Grouped nav */}
-      <nav className="flex flex-col gap-4" aria-label="Workbench tools">
+      <nav className="flex flex-col gap-3" aria-label="Workbench tools">
         {GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="mb-0.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               {group.label}
             </p>
             <ul className="flex flex-col gap-0.5">
@@ -161,7 +161,14 @@ export function WorkbenchSidebar({
                       )}
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
-                      <span className="truncate">{item.label}</span>
+                      {/* `truncate` silently ate the tail of "Music Production
+                          Tools" at 232px. The sidebar is now wide enough for
+                          every label, and the title keeps the full name
+                          available if a translation or a longer label ever
+                          overflows again. */}
+                      <span className="truncate" title={item.label}>
+                        {item.label}
+                      </span>
                     </Link>
                   </li>
                 );

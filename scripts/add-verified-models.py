@@ -251,6 +251,42 @@ PARITY_BATCH = [
      ["dry", "No dry"], ["Dereverb"], None, None),
 ]
 
+# Explicit repair capabilities. Deliberately NOT derived from `target`: a model
+# being `dual` or `instrumental` says nothing about whether it performs a
+# repair, so eligibility is its own declared field.
+#
+# Every value here was MEASURED by scripts/test-repair-models.py, which runs the
+# model on a degraded fixture and correlates each output against the known-clean
+# signal. primaryStem is the stem that wins by a decisive margin; it is never a
+# guess and never outputs[0].
+#
+#   model                    fixture   clean ref     winner       r      residue r
+#   mdx_dereverb             reverb    probe_clip    Dry        +0.826    0.208
+#   mbr_bleed_suppressor     bleed     clean_inst    Instrumental +0.992   0.105
+#   mbr_crowd                bleed     clean_inst    Other      +0.972    0.070
+#
+# All three preserve 2 channels and the source sample rate.
+REPAIR_CAPABILITIES = {
+    "mdx_dereverb": {
+        "categories": ["dereverb"],
+        "primaryStem": "Dry",
+        "inputScope": "full-mix",
+        "preservesChannels": True,
+    },
+    "mbr_bleed_suppressor": {
+        "categories": ["denoise"],
+        "primaryStem": "Instrumental",
+        "inputScope": "full-mix",
+        "preservesChannels": True,
+    },
+    "mbr_crowd": {
+        "categories": ["live-cleanup"],
+        "primaryStem": "Other",
+        "inputScope": "full-mix",
+        "preservesChannels": True,
+    },
+}
+
 
 def _unpack(spec):
     """Normalise a spec to a dict.
@@ -391,11 +427,19 @@ def main() -> int:
     )
 
     catalog = json.loads(WORKER.read_text(encoding="utf-8"))
-    added, skipped = [], []
+    added, skipped, updated = [], [], []
 
     for spec in VERIFIED_ALL:
         mid = spec[0]
         if mid in catalog:
+            # Back-fill metadata that arrived after the model was first added.
+            # Repair capabilities are measured later than the model is
+            # discovered. Additive only — never touch stems/target, which came
+            # from the probe itself.
+            cap = REPAIR_CAPABILITIES.get(mid)
+            if cap and catalog[mid].get("repair") != cap:
+                catalog[mid]["repair"] = cap
+                updated.append(mid)
             skipped.append(mid)
             continue
         catalog[mid] = worker_entry(spec)
@@ -475,6 +519,41 @@ def main() -> int:
             + new_blocks
             + ui[end:]
         )
+
+    # Back-fill `repair` into models.ts for models that were added before their
+    # capability was measured. Inserted immediately before each entry's closing
+    # brace, so it does not depend on where the entry sits in the array.
+    if not args.dry_run:
+        for mid, cap in REPAIR_CAPABILITIES.items():
+            marker = f'id: "{mid}",'
+            if marker not in ui:
+                continue
+            if "    repair: {" in ui[ui.index(marker):ui.index(marker) + 900]:
+                continue
+            start = ui.index(marker)
+            # Walk from the entry's opening brace to its matching close, then
+            # back up to the START OF THAT LINE. Inserting at the `}` itself
+            # would split `  },` into stray indentation plus a column-0 brace.
+            depth, i = 1, start + 3
+            while depth:
+                if ui[i] == "{":
+                    depth += 1
+                elif ui[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                i += 1
+            line_start = ui.rfind("\n", 0, i) + 1
+            body = (
+                "    repair: {\n"
+                f'      categories: {json.dumps(cap["categories"])},\n'
+                f'      primaryStem: "{cap["primaryStem"]}",\n'
+                f'      inputScope: "{cap["inputScope"]}",\n'
+                f'      preservesChannels: {str(cap["preservesChannels"]).lower()},\n'
+                "    },\n"
+            )
+            ui = ui[:line_start] + body + ui[line_start:]
+            updated.append(f"{mid}(ui)")
 
     # Post-conditions: the UI must contain every id AND every trait entry.
     # A silent partial write is exactly how 12 models ended up with lowercase

@@ -20,7 +20,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 from backend import separate_file
-from repair import repair_file
+from repair_workflow import execute_repair_job
+from model_manager import manager as model_manager
 
 logger = logging.getLogger("uvr.queue")
 
@@ -333,12 +334,15 @@ class JobQueue:
         await self._broadcast(job)
         try:
             if job.kind == "repair":
+                # The plan was validated at submit time; here we only execute
+                # it. `repair_workflow` keeps the ONE-element result contract
+                # and owns the stage order, so nothing below changes.
                 stems = await asyncio.to_thread(
-                    repair_file,
+                    execute_repair_job,
                     job.input_path,
                     job.output_dir,
-                    job.options.get("repairOps") or [],
-                    job.options.get("outputFormat", "wav"),
+                    job.options.get("repairPlan") or {},
+                    model_manager,
                     lambda p, s: self._on_progress(job, p, s),
                 )
             else:

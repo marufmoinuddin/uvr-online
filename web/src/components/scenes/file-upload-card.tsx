@@ -63,6 +63,8 @@ interface FileUploadCardProps {
    * means the user has not chosen one yet.
    */
   extractTarget?: string | null;
+  /** Neural repair model. Present only for repair scenes. */
+  repairModel?: string | null;
 }
 
 /**
@@ -76,6 +78,7 @@ export function FileUploadCard({
   repairOps,
   onRepairOpsChange,
   extractTarget,
+  repairModel = null,
 }: FileUploadCardProps) {
   const selectedModelId = useStore((s) => s.selectedModelId);
   const addJob = useStore((s) => s.addJob);
@@ -156,19 +159,21 @@ export function FileUploadCard({
   const isRepairScene = scene === "audio-repair";
   const isInstrumentScene = scene === "instrument-extractor";
   const repairSelection = repairOps ?? [];
-  // A repair with nothing selected would be rejected by the worker anyway;
-  // disable it here so the user finds out before uploading.
-  const needsRepairOps = isRepairScene && repairSelection.length === 0;
   // Same reasoning: without a target the worker has no stem to keep, so it
   // would either reject the job or return the wrong one-element list.
   const needsInstrument = isInstrumentScene && !extractTarget;
+  // A repair needs SOMETHING to do — a model, a fix-up, or both. (The older
+  // "needs at least one op" rule was wrong once a neural model became an
+  // option: choosing only a model is a complete, valid repair.)
+  const needsRepairWork =
+    isRepairScene && repairSelection.length === 0 && !repairModel;
 
   const handleProcess = async () => {
     if (
       files.length === 0 ||
       submitting ||
       isEnsemble ||
-      needsRepairOps ||
+      needsRepairWork ||
       needsInstrument
     ) {
       return;
@@ -185,7 +190,12 @@ export function FileUploadCard({
             options: {
               outputFormat,
               extractInstrumental: scene === "vocal-remover" || scene === "karaoke",
-              ...(isRepairScene ? { repairOps: repairSelection } : {}),
+              ...(isRepairScene
+                ? {
+                    repairOps: repairSelection,
+                    ...(repairModel ? { repairModel } : {}),
+                  }
+                : {}),
               ...(isInstrumentScene && extractTarget
                 ? { extractTarget }
                 : {}),
@@ -222,7 +232,7 @@ export function FileUploadCard({
           files.length > 0 &&
           !submitting &&
           !isEnsemble &&
-          !needsRepairOps &&
+          !needsRepairWork &&
           !needsInstrument &&
           backendOnline !== false
         ) {
@@ -235,7 +245,7 @@ export function FileUploadCard({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [files.length, submitting, isEnsemble, needsRepairOps, backendOnline]);
+  }, [files.length, submitting, isEnsemble, needsRepairWork, backendOnline]);
 
   const processLabel = PROCESS_LABEL[scene] ?? "Process audio";
   const offline = backendOnline === false;
@@ -478,7 +488,7 @@ export function FileUploadCard({
                 submitting ||
                 isEnsemble ||
                 offline ||
-                needsRepairOps ||
+                needsRepairWork ||
                 needsInstrument
               }
               title={
@@ -488,6 +498,8 @@ export function FileUploadCard({
                     ? "Ensemble presets fuse the results of existing jobs — run 2 or more separations first, then use the Ensemble builder on the Explore page."
                     : needsInstrument
                       ? "Choose an instrument to extract first."
+                      : needsRepairWork
+                      ? "Choose a repair model or at least one fix-up first."
                       : undefined
               }
               className={cn(

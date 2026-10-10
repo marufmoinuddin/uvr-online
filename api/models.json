@@ -767,7 +767,15 @@
     ],
     "categories": [
       "Crowd"
-    ]
+    ],
+    "repair": {
+      "categories": [
+        "live-cleanup"
+      ],
+      "primaryStem": "Other",
+      "inputScope": "full-mix",
+      "preservesChannels": true
+    }
   },
   "bs_roformer_viperx_1297": {
     "registry": "model_bs_roformer_ep_317_sdr_12.9755.ckpt",
@@ -827,7 +835,15 @@
     "stems": [
       "bleed",
       "instrumental"
-    ]
+    ],
+    "repair": {
+      "categories": [
+        "denoise"
+      ],
+      "primaryStem": "Instrumental",
+      "inputScope": "full-mix",
+      "preservesChannels": true
+    }
   },
   "mbr_metal_mesk": {
     "name": "Metal Inst (MESK)",
@@ -1049,6 +1065,14 @@
     ],
     "categories": [
       "Dereverb"
-    ]
+    ],
+    "repair": {
+      "categories": [
+        "dereverb"
+      ],
+      "primaryStem": "Dry",
+      "inputScope": "full-mix",
+      "preservesChannels": true
+    }
   }
 }

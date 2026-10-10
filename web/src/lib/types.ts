@@ -24,6 +24,35 @@ export type ModelTarget =
  */
 export type UsageTier = "1x" | "2x" | "3x+";
 
+/**
+ * Repair capabilities a model may declare.
+ *
+ * This is deliberately NOT derived from `target`: being `dual` or `instrumental`
+ * says nothing about whether a model performs a repair. Eligibility is its own
+ * field so the Audio Repair scene can never offer a separation model that
+ * cannot actually repair.
+ */
+export type NeuralRepairCategory =
+  | "denoise"
+  | "dereverb"
+  | "live-cleanup"
+  | "enhance";
+
+export interface RepairCapability {
+  categories: NeuralRepairCategory[];
+  /**
+   * The stem that holds the REPAIRED audio, chosen by measuring each output
+   * against a known-clean reference (scripts/test-repair-models.py) — never by
+   * guessing, and never outputs[0]. A model emitting two files does not tell you
+   * which one is the repair.
+   */
+  primaryStem: string;
+  /** What the model expects to be fed. */
+  inputScope: "full-mix" | "vocals" | "instrumental" | "speech";
+  /** Measured: true when the output keeps the source channel count. */
+  preservesChannels: boolean;
+}
+
 export interface Model {
   id: string;
   name: string;
@@ -66,6 +95,11 @@ export interface Model {
    * that never writes a Piano stem must not appear in the piano list.
    */
   instrumentTargets?: string[];
+  /**
+   * Present only when this model has been verified to perform a neural repair.
+   * Drives Audio Repair eligibility; see `RepairCapability`.
+   */
+  repair?: RepairCapability;
 }
 
 export type JobStatus = "queued" | "processing" | "ready" | "error" | "cancelled";

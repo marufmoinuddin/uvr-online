@@ -160,6 +160,29 @@ def c_instrument_target_extra_in_ui(t: Path) -> None:
     )
 
 
+def c_repair_stem_differs(t: Path) -> None:
+    # The UI would tell the workflow to resolve "Instrumental" while the worker
+    # catalog says "Dry" — the job then fails at the very end, after a GPU run.
+    _edit_ui(t, 'primaryStem: "Instrumental",', 'primaryStem: "Drums",')
+
+
+def c_repair_dropped_from_ui(t: Path) -> None:
+    # Removing the whole repair block from one side hides the model from the
+    # Audio Repair picker in exactly one half of the app.
+    def f(d):
+        d["mbr_bleed_suppressor"].pop("repair", None)
+    _edit_worker(t, f)
+
+
+def c_repair_category_differs(t: Path) -> None:
+    _edit_ui(t, 'categories: ["live-cleanup"],', 'categories: ["enhance"],')
+
+
+def c_repair_without_primary_stem(t: Path) -> None:
+    # A capability with no primaryStem is a promise the workflow cannot keep.
+    _edit_ui(t, '      primaryStem: "Other",\n', "")
+
+
 CASES = [
     ("model in worker catalog but not in UI", c_worker_only_id),
     ("unsupported flag missing from UI", c_unsupported_missing_in_ui),
@@ -172,6 +195,10 @@ CASES = [
     ("repair scene declaring a default model", c_repair_scene_with_model),
     ("instrument target dropped from UI", c_instrument_target_missing_in_ui),
     ("instrument target added in UI only", c_instrument_target_extra_in_ui),
+    ("repair primaryStem differs between catalogs", c_repair_stem_differs),
+    ("repair block removed from worker catalog", c_repair_dropped_from_ui),
+    ("repair category differs between catalogs", c_repair_category_differs),
+    ("repair capability with no primaryStem", c_repair_without_primary_stem),
 ]
 
 

@@ -84,36 +84,11 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Toggle theme">
-                {theme === "dark" ? (
-                  <Moon className="h-4 w-4" />
-                ) : theme === "light" ? (
-                  <Sun className="h-4 w-4" />
-                ) : (
-                  <Monitor className="h-4 w-4" />
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Theme</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => setTheme("light")}>
-                <Sun className="h-4 w-4" /> Light
-                {theme === "light" && <Check className="ml-auto h-4 w-4" />}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setTheme("dark")}>
-                <Moon className="h-4 w-4" /> Dark
-                {theme === "dark" && <Check className="ml-auto h-4 w-4" />}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setTheme("system")}>
-                <Monitor className="h-4 w-4" /> System
-                {theme === "system" && <Check className="ml-auto h-4 w-4" />}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
+          {/* Theme switcher removed: the app is dark-only (see
+              `hooks/useTheme.ts` — component surfaces are hardcoded dark, so
+              light mode rendered dark-on-dark text and white-on-white
+              borders). Offering Light/System here was a promise the UI could
+              not keep. Re-add with the surface migration, not before. */}
           <div className="hidden items-center gap-2 sm:flex">
             <TooltipProvider>
               <Tooltip>

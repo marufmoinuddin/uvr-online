@@ -3,14 +3,24 @@
 import { useEffect } from "react";
 import { useStore } from "@/lib/store";
 
-function resolveTheme(theme: "light" | "dark" | "system"): "light" | "dark" {
-  if (typeof window === "undefined") return "light";
-  if (theme === "system") {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
-  }
-  return theme;
+/**
+ * The app is DARK ONLY, matching uvrvocalremover.com (whose own theme toggle
+ * does not actually switch).
+ *
+ * This is not a shortcut — light mode was reachable and visibly broken.
+ * Component surfaces are hardcoded dark (`bg-[#0F1116]`, `bg-[#141721]`,
+ * `bg-[#12141A]`) and borders use `border-white/10`, so on a light background
+ * ~120 elements rendered white-on-white borders and dark-on-dark text. The
+ * header toggle was therefore a promise the app could not keep.
+ *
+ * Supporting light means replacing every hardcoded surface with a token
+ * (`bg-card`, `bg-surface`, `border-border`) and re-auditing contrast. Until
+ * that migration is done, `dark` is forced rather than shipping a broken
+ * theme. `theme`/`setTheme` stay in the store so re-enabling is a one-line
+ * change here plus the surface migration.
+ */
+function resolveTheme(_theme: "light" | "dark" | "system"): "light" | "dark" {
+  return "dark";
 }
 
 export function useTheme() {
@@ -19,21 +29,8 @@ export function useTheme() {
 
   useEffect(() => {
     const root = document.documentElement;
-    const resolved = resolveTheme(theme);
-    root.classList.toggle("dark", resolved === "dark");
-    root.style.colorScheme = resolved;
-  }, [theme]);
-
-  useEffect(() => {
-    if (theme !== "system") return;
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => {
-      const root = document.documentElement;
-      root.classList.toggle("dark", mq.matches);
-      root.style.colorScheme = mq.matches ? "dark" : "light";
-    };
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
+    root.classList.add("dark");
+    root.style.colorScheme = "dark";
   }, [theme]);
 
   return { theme, setTheme, resolved: resolveTheme(theme) };

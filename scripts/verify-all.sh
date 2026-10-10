@@ -35,8 +35,17 @@ python3 "$ROOT/scripts/verify-catalog.py"
 record $? "api/models.json and web models.ts agree"
 
 stage "2/6 catalog verifier self-test"
-python3 "$ROOT/scripts/test-verify-catalog.py" >/dev/null 2>&1
-record $? "verifier still catches all injected bug classes"
+if python3 "$ROOT/scripts/test-verify-catalog.py" >/dev/null 2>&1; then
+  record 0 "verifier still catches all injected bug classes"
+else
+  record 1 "verifier still catches all injected bug classes"
+fi
+
+# The catalogue writer edits models.ts IN PLACE. A writer that can silently
+# mangle the file it maintains is worse than none, so its nested-metadata
+# insert, idempotency and misaligned-spec paths are regression-tested too.
+python3 "$ROOT/scripts/test-add-verified-models.py" >/tmp/verify-writer.log 2>&1
+record $? "catalogue writer is idempotent and formats nested metadata safely"
 
 stage "3/6 backend compiles"
 if [ -x "$ROOT/api/.venv/bin/python" ]; then
@@ -52,14 +61,21 @@ COMPILE_OUT=$("$PY" -m py_compile \
   "$ROOT/api/repair.py" 2>&1)
 record $? "api/*.py compile cleanly ${COMPILE_OUT:+— $COMPILE_OUT}"
 
-stage "4/6 repair pipeline (real ffmpeg)"
+stage "4/6 repair pipeline (real ffmpeg + neural workflow)"
 # DSP needs more than "exit 0": this checks every op is audible, full length,
-# and that a chain which silences the signal is rejected.
+# and that a chain which silences the signal is rejected. The second script
+# covers the combined DSP + neural repair workflow.
 if [ -x "$ROOT/api/.venv/bin/python" ]; then
   "$ROOT/api/.venv/bin/python" "$ROOT/scripts/test-repair.py" >/tmp/verify-repair.log 2>&1
   rc=$?
   [ $rc -ne 0 ] && tail -12 /tmp/verify-repair.log
   record $rc "repair ops produce audible, full-length audio"
+
+  "$ROOT/api/.venv/bin/python" "$ROOT/scripts/test-repair-workflow.py" \
+    >/tmp/verify-repair-workflow.log 2>&1
+  rc=$?
+  [ $rc -ne 0 ] && tail -14 /tmp/verify-repair-workflow.log
+  record $rc "combined DSP+neural repair: one output, declared stem, stage order"
 else
   echo "  – skipped (no api/.venv)"
 fi

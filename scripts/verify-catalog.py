@@ -79,6 +79,35 @@ def _match_array(obj: str, key: str) -> str:
     return m.group(1) if m else ""
 
 
+def _repair_block(obj: str) -> str | None:
+    """Body of the `repair: { ... }` object inside a model entry, or None."""
+    m = re.search(r"\brepair\s*:\s*\{(.*?)\n\s*\}", obj, re.S)
+    return m.group(1) if m else None
+
+
+def _repair_of(obj: str) -> dict | None:
+    """Parse a model's repair capability out of models.ts.
+
+    Returns None when the model declares no repair at all — which is the normal
+    case, not an error. Eligibility in the Audio Repair scene is this field, so
+    the two catalogs disagreeing about its absence would hide a model on one
+    side of the app only.
+    """
+    block = _repair_block(obj)
+    if block is None:
+        return None
+    cats = re.search(r"categories\s*:\s*\[([^\]]*)\]", block)
+    stem = re.search(r"primaryStem\s*:\s*[\"']([^\"']*)[\"']", block)
+    scope = re.search(r"inputScope\s*:\s*[\"']([^\"']*)[\"']", block)
+    chans = re.search(r"preservesChannels\s*:\s*(true|false)", block)
+    return {
+        "categories": sorted(re.findall(r"\"([^\"]+)\"", cats.group(1))) if cats else [],
+        "primaryStem": stem.group(1) if stem else None,
+        "inputScope": scope.group(1) if scope else None,
+        "preservesChannels": chans.group(1) == "true" if chans else None,
+    }
+
+
 def parse_ui_catalog(source: str) -> dict:
     base = _array_body(source, "const BASE_MODELS", "const ENSEMBLE_PRESETS")
     ens = _array_body(
@@ -102,6 +131,10 @@ def parse_ui_catalog(source: str) -> dict:
             "instrumentTargets": sorted(
                 set(re.findall(r'"([^"]+)"', _match_array(obj, "instrumentTargets")))
             ),
+            # Explicit neural-repair capability. The Audio Repair scene offers a
+            # model iff this is truthy, so a disagreement between the two files
+            # would hide a repair model in one half of the app only.
+            "repair": _repair_of(obj),
         }
 
     scenes: dict[str, dict] = {}
@@ -268,6 +301,30 @@ def main() -> int:
     else:
         inst = [s for s, m in scenes.items() if m["instrument"]]
         check(OK, "instruments: every instrument scene has models", f"{len(inst)} scenes")
+
+    # 4c. repair capability parity ----------------------------------------
+    bad_repair = []
+    for mid, m in ui_models.items():
+        w = worker.get(mid, {}).get("repair")
+        if w != m["repair"]:
+            bad_repair.append(f"{mid}: worker={w} ui={m['repair']}")
+    if bad_repair:
+        check(FAIL, "repair: capabilities differ between catalogs", "; ".join(bad_repair))
+    else:
+        tagged = sum(1 for m in ui_models.values() if m["repair"])
+        check(OK, "repair: capabilities match in both files", f"{tagged} declared")
+
+    # A declared repair capability is a promise. Without a primaryStem the
+    # workflow cannot tell which output is the repaired one and would have to
+    # guess, so that combination is a catalog bug rather than a warning.
+    incomplete = [
+        mid for mid, m in ui_models.items()
+        if m["repair"] and not (m["repair"].get("primaryStem") and m["repair"].get("categories"))
+    ]
+    if incomplete:
+        check(FAIL, "repair: capability missing primaryStem/categories", ", ".join(sorted(incomplete)))
+    else:
+        check(OK, "repair: every capability names a primaryStem and category")
 
     # 5. UI-only ids are ensembles ----------------------------------------
     stray = sorted(i for i in ui_only if not ui_models[i]["ensemble"])

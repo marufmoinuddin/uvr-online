@@ -1,0 +1,117 @@
+# Builds a container image for every commit.
+#
+# Two images are produced, one per build context declared in docker-compose.yml:
+#   uvr-api  -> ./api   CUDA/PyTorch worker  (base: nvidia/cuda:12.8.0-cudnn-devel)
+#   uvr-web  -> ./web   Next.js frontend     (base: node:20-alpine)
+#
+# Tags, in order of usefulness:
+#   <sha>            long commit SHA — pushed for EVERY commit. This is the
+#                    "image per commit" contract; a commit can always be
+#                    reproduced exactly.
+#   <branch>, latest only on the default branch, so the moving tag never
+#                    flips to a feature branch build.
+#
+# Published to GHCR with the automatic GITHUB_TOKEN — no registry secret to
+# configure. Requires "Read and write permissions" on Actions to be enabled
+# for the repo (Settings -> Actions -> General -> Workflow permissions).
+
+name: Docker Image
+
+on:
+  push:
+  workflow_dispatch:
+
+# A superseded commit's build is pure waste (the API image pulls several GB of
+# CUDA wheels), so cancel it when a newer commit lands on the same ref.
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    name: build uvr-${{ matrix.image }}
+    runs-on: ubuntu-latest
+    # The api image compiles/installs torch+cu128; be generous.
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: api
+            context: ./api
+          - image: web
+            context: ./web
+            # Mirrors the compose default. NEXT_PUBLIC_* is inlined into the
+            # client bundle at BUILD time, so it must be a build arg — setting
+            # it at runtime has no effect.
+            build_args: NEXT_PUBLIC_WS_URL=ws://localhost:8000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ghcr.io demands a lowercase owner, but `github.repository_owner` is
+      # verbatim (it keeps the account's capitalisation). One capital letter
+      # makes every push fail with a confusing 404 from the registry.
+      - name: Resolve image slug
+        id: vars
+        run: |
+          echo "slug=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Compute tags and labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.vars.outputs.slug }}/uvr-${{ matrix.image }}
+          tags: |
+            type=sha,format=long
+            type=ref,event=branch,enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=uvr-${{ matrix.image }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ${{ env.REGISTRY }}
+        # No PR trigger today; this guard keeps a later `pull_request:` addition
+        # from trying to push with a read-only fork token.
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.context }}/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ matrix.build_args }}
+          # Per-image cache scope: api and web share no layers, and sharing a
+          # scope would thrash rather than reuse.
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Summary
+        run: |
+          {
+            echo "### \`uvr-${{ matrix.image }}\` — \`${{ github.sha }}\`"
+            echo ""
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

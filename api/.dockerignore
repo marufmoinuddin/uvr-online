@@ -1,0 +1,30 @@
+# Build context for api/Dockerfile.
+#
+# The Dockerfile ends in `COPY . .`, so anything not listed here is baked into
+# the image. The local uv venv alone is ~7.4 GB — shipping it would duplicate
+# every dependency inside /opt/venv (installed by pip in an earlier layer) and
+# make the image enormous for no functional gain.
+
+# --- local virtualenvs (installed properly in /opt/venv by pip) ---
+.venv/
+venv/
+.env
+
+# --- python bytecode ---
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# --- runtime artefacts; the container writes these to /data, bind-mounted ---
+output/
+
+# --- keep vendor/ : it carries the bundled MSST-WebUI inference code that
+#     requirements.txt depends on. Do NOT add it here. ---
+
+# --- local env overrides (keep .env.example) ---
+.env.local
+.env.*.local
+
+# --- misc ---
+.git/
+*.log

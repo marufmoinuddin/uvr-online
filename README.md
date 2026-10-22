@@ -35,8 +35,16 @@ models' default chunk overlap, and a **5-second** clip took over 40 minutes.
 Turning autocast off and halving the overlap brought the same job down to
 seconds.
 
-Measured on an **RTX 2060** + **16 vCPU** (8 physical cores) / 38 GB RAM,
-PyTorch 2.8, on a **5-second** stereo clip at 44.1 kHz:
+**Reference hardware:** an **RTX 2060** + **16 vCPU** (8 physical cores) / 38 GB
+RAM, PyTorch 2.8. Every number in this section comes from that machine, on a
+**5-second** stereo clip at 44.1 kHz. **Minimum hardware: 4 cores, 4 GB RAM**
+(8 GB if you want the Demucs models, which are the memory-hungry ones). The
+same 4 enabled models were re-measured pinned to 4 cores: they take 1.3–1.7×
+longer than on 16 (`htdemucs_6s` 8.4 s → 10.9 s, `mbr_guitar_becruily`
+13.3 s → 20.7 s), so a 2-minute clip still finishes in **4–8 minutes** on
+4 cores. CPU performance is very machine-dependent — the cutoff was calibrated
+on the reference rig, so re-run `scripts/benchmark-cpu.py` on your own box
+before changing which models are enabled.
 
 | Model | Architecture | GPU | CPU | CPU vs GPU | 2-min clip on CPU |
 |---|---|---|---|---|---|
@@ -52,7 +60,9 @@ them before anything is uploaded.
 
 The cutoff, written down so it can be re-derived: **at most 15 s per 5 s clip**
 on the reference machine — which extrapolates to roughly 6 minutes for a
-2-minute clip, and sits well inside the 30-minute job timeout. The first
+2-minute clip, about **5× inside the 30-minute job timeout** (the slowest
+enabled model, `mbr_guitar_becruily`, takes ~5.3 min for a 2-minute clip;
+the 30-minute ceiling is a backstop, not the working limit). The first
 rejected model, `htdemucs_ft`, takes 16.4 s for the same clip; the heaviest
 models (`mbr_duality_v1`, `mbr_instvox_duality_v2`) need 280 s, and the
 HyperACE pair — which runs through the vendored MSST path, a different and
@@ -75,9 +85,6 @@ Over-long submissions are **refused up front**, with the limit quoted — not
 accepted and then left stalling the queue. Models that were measured to be too
 slow are refused the same way, and the picker marks them "No CPU" so you never
 have to discover it after uploading.
-
-Minimum sensible hardware: **2 cores, 4 GB RAM** (8 GB if you want the
-Demucs models, which are the memory-hungry ones).
 
 ---
 

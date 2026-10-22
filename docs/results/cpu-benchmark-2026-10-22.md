@@ -127,6 +127,34 @@ conservatively (they over-estimate, because the fixed cost is spread over a
 shorter clip). A 120 s clip — the CPU-mode limit — finishes inside the
 30-minute job timeout for every measured model.
 
+## 4-core measurement (2026-10-22)
+
+The reference numbers above are on the 16-vCPU machine. CPU mode is also meant
+to work on small boxes, so the same 4 `cpuOk` models were re-measured with the
+process pinned to **4 cores** (`taskset -c 0-3` + `UVR_CPU_THREADS=4`,
+confirmed by `sched_getaffinity = 4` and `torch.get_num_threads() = 4`), same
+5 s clip:
+
+| Model | 16 vCPU | 4 cores | slow-down | 2-min clip on 4 cores |
+|---|---|---|---|---|
+| `htdemucs_6s` | 8.4 s | 10.9 s | 1.3× | ~4 min |
+| `htdemucs` | 8.5 s | 11.6 s | 1.4× | ~5 min |
+| `uvr_2hp` | 9.7 s | 16.1 s | 1.7× | ~6 min |
+| `mbr_guitar_becruily` | 13.3 s | 20.7 s | 1.6× | ~8 min |
+
+Scaling is sub-linear — going from 16 to 4 cores costs only 1.3–1.7×, not 4×,
+because these models are not purely CPU-bound and torch's thread pool already
+only used ~8 threads on the big box.
+
+**Consequence for the cutoff:** the slowest enabled model (`mbr_guitar_becruily`)
+reaches **20.7 s per 5 s clip** on 4 cores — it crosses the 15 s line on a
+*rate* basis but still extrapolates to ~8 min for a 2-minute clip, comfortably
+inside the 30-minute timeout. The cutoff was calibrated on the reference rig;
+on a 4-core box the real constraint is the **absolute** 30-minute ceiling, not
+the 15 s rate. If you are tuning `cpuOk` for a machine slower than 4 modern
+cores, re-run `scripts/benchmark-cpu.py` there and check the 2-minute-clip
+column rather than the 5 s column.
+
 ## Reading the table
 
 - **`cpuOk`** is the flag the catalogue carries. It is set from these numbers,

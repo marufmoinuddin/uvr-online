@@ -5,13 +5,13 @@
 **With a GPU:**
 
 - Docker with the **NVIDIA Container Toolkit** (`nvidia-ctk runtime configure`)
-- An NVIDIA GPU (≥ 4 GB VRAM recommended; verified on RTX 2060)
+- An NVIDIA GPU (≥ 4 GB VRAM recommended for smaller models)
 - ~10 GB free disk for the CUDA base image and the torch cu128 wheels
 
 **Without a GPU (CPU mode):**
 
 - Docker (no NVIDIA toolkit needed)
-- 2+ CPU cores, 4 GB RAM
+- 4+ CPU cores, 4 GB RAM (8 GB recommended for Demucs models)
 - ~4 GB free disk for the CPU image and the torch CPU wheels
 
 Inference is self-contained — there is no MSST-WebUI checkout to install or mount.
@@ -19,7 +19,7 @@ Inference is self-contained — there is no MSST-WebUI checkout to install or mo
 ## Docker Compose
 
 ```bash
-cd ~/docker/uvr-stack
+cd /path/to/uvr-online
 docker compose up -d --build
 
 # optional — every value already has a working default
@@ -66,7 +66,7 @@ The clean fix is a `user: "${UID}:${GID}"` entry on the service plus a one-time
 ## Smoke test
 
 ```bash
-curl -s localhost:8000/api/health    # {"gpu":true,"gpuName":"NVIDIA GeForce RTX 2060 ..."}
+curl -s localhost:8000/api/health    # inspect the reported device and thread budget
 curl -s localhost:8000/api/models | head -c 200
 curl -s localhost:3000 | head        # HTML
 ```
@@ -88,7 +88,7 @@ front. The current set and the cutoff are in
 wheels support (torch cu128 has no 3.13+ builds).
 
 ```bash
-cd ~/docker/uvr-stack/api
+cd /path/to/uvr-online/api
 ./run-local.sh          # first run does `uv sync`; then http://localhost:8000
 ```
 
@@ -98,7 +98,7 @@ cd ~/docker/uvr-stack/api
 Web:
 
 ```bash
-cd ~/docker/uvr-stack/web
+cd /path/to/uvr-online/web
 npm install
 npm run dev        # or: npm run build && npm start
 ```

@@ -14,14 +14,12 @@ python3 scripts/benchmark-cpu.py --models <id,id,…> --devices cuda,cpu \
 `--allow-blocked` runs the models the worker *refuses* in CPU mode. Without it
 the refusal has no evidence behind it.
 
-## Test rig
+## Benchmark environment
 
 | | |
 |---|---|
-| GPU | NVIDIA GeForce RTX 2060 (Max-Q, 6 GB VRAM) |
-| CPU | 16 vCPU / 8 physical cores (x86-64) |
-| RAM | 38 GB |
-| OS | Linux (CachyOS), Python 3.12, PyTorch 2.8.0+cu128, audio-separator 0.47.0 |
+| Baseline | Modern x86-64 Linux host with 8 physical cores and ample RAM |
+| Software | Python 3.12, PyTorch 2.8.0, audio-separator 0.47.0 |
 | Thread budget | `torch.get_num_threads()` = 8, `sched_getaffinity` = 16, no cgroup quota |
 | Clip | 5 s, stereo, 44.1 kHz — a synthetic sine mix, so there is enough spectral content to make the models do real work, and it is deterministic so two runs are comparable |
 | Cache | Warm: every model's weights are already on disk, so **no measurement includes a download** |
@@ -182,9 +180,9 @@ alone here because it is a catalogue bug, not a CPU-mode one.
 
 ## Reproducing on your own hardware
 
-The numbers above are for one machine. CPU performance depends on the core
-count, the memory bandwidth and the single-thread performance, so measure on
-the hardware you actually intend to run:
+The numbers above are a baseline, not a hardware guarantee. CPU performance
+depends on core count, memory bandwidth and single-thread performance, so
+measure on the hardware you actually intend to run:
 
 ```bash
 python3 scripts/benchmark-cpu.py            # the CPU-capable set + two RoFormers

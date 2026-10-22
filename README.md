@@ -22,8 +22,8 @@ upstream cannot load.
 
 | | |
 |---|---|
-| **GPU** | **Optional.** NVIDIA with the CUDA container toolkit. Verified on an RTX 2060 (≥ 4 GB VRAM). |
-| **CPU** | **Optional.** Any x86-64 CPU with 2+ cores. See [CPU mode](#cpu-mode) for the measured limits. |
+| **GPU** | **Optional.** NVIDIA GPU with the CUDA Container Toolkit. 4 GB VRAM is a practical starting point for smaller models. |
+| **CPU** | **Optional.** x86-64 CPU with at least 4 cores and 4 GB RAM. See [CPU mode](#cpu-mode) for limits and supported models. |
 | **Disk** | ~10 GB for the CUDA base image and torch wheels, plus ~4 GB of model weights as you use them. ~4 GB for the CPU image. |
 | **Tooling** | Docker + NVIDIA Container Toolkit (GPU), or just Docker (CPU), or `uv` + Node 20 for dev mode. |
 
@@ -35,16 +35,15 @@ models' default chunk overlap, and a **5-second** clip took over 40 minutes.
 Turning autocast off and halving the overlap brought the same job down to
 seconds.
 
-**Reference hardware:** an **RTX 2060** + **16 vCPU** (8 physical cores) / 38 GB
-RAM, PyTorch 2.8. Every number in this section comes from that machine, on a
-**5-second** stereo clip at 44.1 kHz. **Minimum hardware: 4 cores, 4 GB RAM**
-(8 GB if you want the Demucs models, which are the memory-hungry ones). The
-same 4 enabled models were re-measured pinned to 4 cores: they take 1.3–1.7×
-longer than on 16 (`htdemucs_6s` 8.4 s → 10.9 s, `mbr_guitar_becruily`
-13.3 s → 20.7 s), so a 2-minute clip still finishes in **4–8 minutes** on
-4 cores. CPU performance is very machine-dependent — the cutoff was calibrated
-on the reference rig, so re-run `scripts/benchmark-cpu.py` on your own box
-before changing which models are enabled.
+**Benchmark baseline:** a modern x86-64 Linux host with 8 physical cores and
+ample RAM, PyTorch 2.8. Every number in this section comes from that baseline,
+on a **5-second** stereo clip at 44.1 kHz. **Minimum hardware: 4 cores, 4 GB
+RAM** (8 GB if you want the Demucs models, which are the memory-hungry ones).
+The same 4 enabled models were re-measured pinned to 4 cores: they take
+1.3–1.7× longer than on the baseline, so a 2-minute clip still finishes in
+**4–8 minutes** on 4 cores. CPU performance is machine-dependent — re-run
+`scripts/benchmark-cpu.py` on your own host before changing which models are
+enabled.
 
 | Model | Architecture | GPU | CPU | CPU vs GPU | 2-min clip on CPU |
 |---|---|---|---|---|---|
@@ -91,7 +90,7 @@ have to discover it after uploading.
 ## Quick start (Docker)
 
 ```bash
-cd ~/docker/uvr-stack
+cd /path/to/uvr-online
 docker compose up -d --build
 
 # optional — every value already has a working default
@@ -131,14 +130,14 @@ process start instead of a ~15 minute image rebuild.
 
 ```bash
 # 1. worker — uv provisions a matching interpreter + torch cu128 on first run
-cd ~/docker/uvr-stack/api
+cd /path/to/uvr-online/api
 ./run-local.sh                 # http://localhost:8000  (PORT=8001 to override)
 
 # ... or CPU-only, in a separate venv with the CPU torch wheels:
 ./run-local.sh --cpu
 
 # 2. web
-cd ~/docker/uvr-stack/web
+cd /path/to/uvr-online/web
 npm install
 npm run dev                    # http://localhost:3000
 ```

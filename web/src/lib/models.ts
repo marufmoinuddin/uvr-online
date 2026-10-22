@@ -104,7 +104,7 @@ const BASE_MODELS: Model[] = [
   {
     id: "mel_band_roformer_fv8b",
     unsupported:
-      "Fails to load with this backend — audio-separator's checkpoint loader exits before inference, on both GPU and CPU.",
+      "Fails to load with this backend - audio-separator's checkpoint loader exits before inference, on both GPU and CPU.",
     name: "Mel-Band RoFormer Fv8b",
     shortName: "FV8B",
     arch: "MelBand-RoFormer",

@@ -212,7 +212,7 @@
     "license": "UNSPECIFIED"
   },
   "mel_band_roformer_fv8b": {
-    "unsupported": "Fails to load with this backend — audio-separator's checkpoint loader exits before inference, on both GPU and CPU.",
+    "unsupported": "Fails to load with this backend - audio-separator's checkpoint loader exits before inference, on both GPU and CPU.",
     "registry": "mel_band_roformer_instrumental_fv8b_gabox.ckpt",
     "name": "Mel-Band RoFormer Fv8b",
     "arch": "MelBand-RoFormer",

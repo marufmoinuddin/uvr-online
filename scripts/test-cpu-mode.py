@@ -244,6 +244,41 @@ def _catalogue_tests() -> None:
                 message,
             )
 
+    # The Audio Repair pipeline runs a neural model as one light pass wrapped
+    # in DSP, which is CPU-usable by design. Its models are NOT held to the
+    # separation-mode speed cutoff — this used to break the whole repair
+    # workflow on a CPU worker.
+    repair_models = [m for m in model_manager.all() if m.repair and not m.unsupported]
+    check("at least one repair-capable model exists", len(repair_models) > 0, "")
+    blocked_repair = [m for m in repair_models if not m.cpu_ok]
+    if blocked_repair:
+        m = blocked_repair[0]
+        try:
+            assert_runnable(m.id, "cpu", allow_cpu_blocked=True)
+            check(
+                "a repair model is exempt from the CPU speed cutoff",
+                True,
+                "",
+            )
+        except RuntimeError as exc:
+            check(
+                "a repair model is exempt from the CPU speed cutoff",
+                False,
+                f"{m.id}: {exc}",
+            )
+    # …but the exemption must not bypass the `unsupported` guard.
+    unsupported = [m for m in model_manager.all() if m.unsupported]
+    if unsupported:
+        try:
+            assert_runnable(unsupported[0].id, "cpu", allow_cpu_blocked=True)
+            check(
+                "the exemption does not bypass the unsupported guard",
+                False,
+                f"{unsupported[0].id} was accepted",
+            )
+        except RuntimeError:
+            check("the exemption does not bypass the unsupported guard", True, "")
+
 
 def _make_clip(path: Path, seconds: float, sample_rate: int = 44100) -> Path:
     """A short musical test clip (see scripts/benchmark-cpu.py)."""

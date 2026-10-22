@@ -348,18 +348,23 @@ def cpu_ok(model_id: str) -> bool:
     return bool(getattr(rec, "cpu_ok", False))
 
 
-def assert_runnable(model_id: str, device: str) -> None:
+def assert_runnable(model_id: str, device: str, *, allow_cpu_blocked: bool = False) -> None:
     """Refuse a model the chosen device cannot run, with a usable reason.
 
     Called before any weight is downloaded, so the user gets an immediate
     explanation instead of a long wait followed by a failure.
+
+    `allow_cpu_blocked` exempts the CPU-speed restriction (but not the
+    `unsupported` one): the Audio Repair pipeline runs a neural model as one
+    light pass wrapped in DSP, and is documented as CPU-usable. Its models are
+    deliberately NOT held to the separation-mode speed cutoff.
     """
     rec = manager.get(model_id)
     if rec is None:
         raise RuntimeError(f"Unknown model '{model_id}'.")
     if rec.unsupported:
         raise RuntimeError(f"'{rec.name}' cannot be used: {rec.unsupported}")
-    if device == "cpu" and not rec.cpu_ok:
+    if device == "cpu" and not rec.cpu_ok and not allow_cpu_blocked:
         # Escape hatch for the MEASUREMENT tool only. scripts/benchmark-cpu.py
         # has to be able to time the very models the worker refuses — without
         # that, the refusal has no evidence behind it. Never set this in a
@@ -1287,6 +1292,7 @@ def separate_file(
     extract_instrumental: bool = False,
     progress: Optional[ProgressFn] = None,
     extract_target: Optional[str] = None,
+    allow_cpu_blocked: bool = False,
 ) -> list[dict[str, Any]]:
     progress = progress or (lambda p, s: None)
     # Apply before any model is constructed. Idempotent, and harmless for
@@ -1295,9 +1301,13 @@ def separate_file(
     # Refuse a model this device cannot run BEFORE any weight is downloaded or
     # loaded. The queue checks this too, but the backend is the last line of
     # defence and must not depend on its callers having checked.
+    #
+    # `allow_cpu_blocked` is set by the Audio Repair workflow: its neural
+    # model runs as one light pass wrapped in DSP, which is CPU-usable by
+    # design and is not held to the separation-mode speed cutoff.
     device = resolve_device()
     configure_runtime(device)
-    assert_runnable(model_id, device)
+    assert_runnable(model_id, device, allow_cpu_blocked=allow_cpu_blocked)
     backend = get_backend()
     stems = backend.separate(
         model_id,

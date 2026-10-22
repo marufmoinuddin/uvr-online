@@ -26,6 +26,7 @@ import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
+from typing import Optional
 from urllib.parse import unquote
 
 import torch
@@ -48,7 +49,14 @@ from fastapi.responses import (
     StreamingResponse,
 )
 
-from backend import list_models
+from backend import (
+    cpu_limits,
+    cpu_max_bytes,
+    cpu_max_seconds,
+    effective_cpu_threads,
+    list_models,
+    resolve_device,
+)
 from job_queue import OUTPUT_ROOT, UPLOAD_ROOT, Job, queue
 from model_manager import manager as model_manager
 import repair
@@ -164,12 +172,41 @@ async def health() -> dict:
         gpu_name = torch.cuda.get_device_name(0)
         props = torch.cuda.get_device_properties(0)
         vram_free = round((props.total_memory - torch.cuda.memory_reserved(0)) / 1e6, 1)
+
+    # The device the worker will actually use. `resolve_device` raises for an
+    # impossible configuration (UVR_DEVICE=cuda on a machine with no GPU, or a
+    # misspelled value) — that has to be REPORTED, not turned into a 500 that
+    # hides the reason.
+    device_error = None
+    try:
+        device = resolve_device()
+    except RuntimeError as exc:
+        device = "cpu"
+        device_error = str(exc)
+
     return {
         "gpu": gpu,
         "gpuName": gpu_name,
         "vramFreeMb": vram_free,
         "queueDepth": queue.queue_depth(),
-        "device": f"cuda:{torch.cuda.current_device()}" if gpu else "cpu",
+        # "cuda" or "cpu" — the device separation runs on, which is not always
+        # the same as "is there a GPU": UVR_DEVICE=cpu pins it to the CPU on
+        # a machine that has a perfectly good card.
+        "device": device,
+        "cpuMode": device == "cpu",
+        "deviceError": device_error,
+        # How many threads CPU inference may use, and how many torch actually
+        # has. They differ when a cgroup quota caps the container below the
+        # host's core count, which is exactly when a CPU run gets slowest.
+        "cpuThreads": effective_cpu_threads(),
+        "torchThreads": torch.get_num_threads(),
+        # The models this worker will accept in CPU mode. The UI uses it to
+        # label the ones that would be refused, instead of offering a model
+        # that then fails.
+        "cpuModels": sorted(m.id for m in model_manager.all() if m.cpu_ok),
+        # CPU-mode bounds, so the UI can say "max 2 minutes" rather than
+        # letting the user discover it by being rejected.
+        "cpuLimits": cpu_limits(),
     }
 
 
@@ -364,6 +401,38 @@ def _audio_probe_error(path: Path) -> str | None:
     return None
 
 
+def _audio_duration_seconds(path: Path) -> Optional[float]:
+    """Duration of the first audio stream in seconds, or None if unknown.
+
+    Used to enforce the CPU-mode clip ceiling. ffprobe is asked only for the
+    container duration — it never decodes the audio, so this stays cheap even
+    for a long file.
+    """
+    try:
+        proc = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-select_streams", "a:0",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        # No ffprobe available — skip the check rather than block every upload.
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        value = float((proc.stdout or "").strip())
+    except ValueError:
+        return None
+    return value if value > 0 else None
+
+
 @api.post("/jobs")
 async def create_job(
     file: UploadFile = File(...),
@@ -386,6 +455,14 @@ async def create_job(
     # both). It is selected by the scene rather than a flag so the client cannot
     # ask for one while sending the other's parameters.
     kind = "repair" if scene in REPAIR_SCENES else "separate"
+
+    # The device separation will run on. Resolved once, here, so the model
+    # check and the upload limits below agree with the worker that will
+    # actually do the work.
+    try:
+        device = resolve_device()
+    except RuntimeError as exc:
+        raise HTTPException(500, str(exc)) from exc
 
     if kind == "repair":
         # Validate the whole plan up front — including the neural model's
@@ -433,6 +510,19 @@ async def create_job(
         if rec.unsupported:
             raise HTTPException(400, f"'{rec.name}' cannot be used: {rec.unsupported}")
 
+        # In CPU mode, refuse a model that would take hours BEFORE the upload
+        # starts. The catalogue marks the models that were measured to be
+        # usable on a CPU; offering the rest and failing after a long wait is
+        # the behaviour this replaces.
+        if device == "cpu" and not rec.cpu_ok:
+            raise HTTPException(
+                400,
+                f"'{rec.name}' is not supported in CPU mode — it is one of the "
+                "heavy models that would take hours to run without a GPU. "
+                "Pick one of the CPU-compatible models (they are marked in the "
+                "picker), or run the worker on a machine with a GPU.",
+            )
+
         # Validate the instrument target against the model's OWN metadata before
         # inference. Checking here rather than after separation means the user is
         # told immediately, not after a full model run that then fails.
@@ -474,6 +564,32 @@ async def create_job(
         problem = _audio_probe_error(dest)
         if problem:
             raise HTTPException(400, problem)
+
+        # CPU-mode ceilings. A CPU run is orders of magnitude slower than a GPU
+        # run, so an unbounded submission is not merely slow — it holds the
+        # single-threaded queue for hours. Rejecting it here, with the actual
+        # limit quoted, is far kinder than accepting it and stalling.
+        #
+        # Separation only: Audio Repair is ffmpeg DSP plus (at most) one
+        # neural pass, and the scene is documented as CPU-friendly already.
+        if kind == "separate" and device == "cpu":
+            max_bytes = cpu_max_bytes()
+            if size > max_bytes:
+                raise HTTPException(
+                    413,
+                    f"CPU mode accepts files up to {max_bytes // (1024 * 1024)} MB. "
+                    "This one is "
+                    f"{round(size / (1024 * 1024), 1)} MB.",
+                )
+            max_seconds = cpu_max_seconds()
+            duration = _audio_duration_seconds(dest)
+            if duration is not None and duration > max_seconds:
+                raise HTTPException(
+                    400,
+                    f"CPU mode accepts clips up to {max_seconds} seconds. This "
+                    f"one is {round(duration, 1)} seconds. Trim it, or run the "
+                    "worker on a machine with a GPU.",
+                )
     except BaseException:
         # Never leave a half-written upload directory behind on rejection.
         shutil.rmtree(tmp, ignore_errors=True)

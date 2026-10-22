@@ -1,0 +1,29 @@
+# CPU-only stack.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.cpu.yml up
+#
+# An override file rather than a profile because compose MERGES the two
+# files: a second `api` service declared under a `cpu` profile would be
+# merged INTO the GPU one rather than replacing it, and both would try to
+# bind port 8000. Here the same `api` service is REPLACED — a different
+# Dockerfile, no GPU reservation, and the worker pinned to the CPU.
+#
+# Everything else (the web container, the volumes, the model store) is
+# inherited from docker-compose.yml, so the two stacks behave identically.
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.cpu
+    environment:
+      # The CPU image ships no CUDA runtime at all, so the worker is pinned to
+      # the CPU rather than left to guess.
+      - UVR_DEVICE=cpu
+    deploy:
+      resources:
+        reservations:
+          # `!override` REPLACES the list instead of appending to it. Without
+          # it the GPU reservation from the base file survives, and compose
+          # fails with "could not select device driver" on a machine with no
+          # NVIDIA runtime — which is exactly the machine this file is for.
+          devices: !override []

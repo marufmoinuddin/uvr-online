@@ -23,6 +23,18 @@ interface Store {
    * just impractically slow — so this is reported honestly rather than hidden.
    */
   device: "" | "cuda" | "cpu";
+  /**
+   * Models the worker will accept in CPU mode, straight from its health
+   * endpoint. Empty until the first response, and while a GPU is in use — in
+   * which case it is not consulted at all.
+   */
+  cpuModels: string[];
+  /**
+   * CPU-mode ceilings (max clip length, max upload size, job timeout), so the
+   * UI can state the limit instead of letting the user discover it by being
+   * rejected.
+   */
+  cpuLimits: { maxSeconds: number; maxBytes: number; timeoutSeconds: number } | null;
 
   setModelCatalog: (models: Model[]) => void;
   selectModel: (id: string) => void;
@@ -31,6 +43,10 @@ interface Store {
   toggleFavorite: (id: string) => void;
   setBackendOnline: (online: boolean) => void;
   setDevice: (device: "cuda" | "cpu") => void;
+  setCpuCapability: (
+    cpuModels: string[],
+    cpuLimits: { maxSeconds: number; maxBytes: number; timeoutSeconds: number } | null,
+  ) => void;
   addJob: (job: Job) => void;
   upsertJob: (job: Job) => void;
   syncJobs: (jobs: Job[]) => void;
@@ -51,6 +67,8 @@ export const useStore = create<Store>()(
       favorites: [],
       backendOnline: null,
       device: "" as const,
+      cpuModels: [] as string[],
+      cpuLimits: null,
 
       setModelCatalog: (modelCatalog) => set({ modelCatalog }),
       selectModel: (selectedModelId) => set({ selectedModelId }),
@@ -58,6 +76,7 @@ export const useStore = create<Store>()(
       setTheme: (theme) => set({ theme }),
       setBackendOnline: (backendOnline) => set({ backendOnline }),
       setDevice: (device) => set({ device }),
+      setCpuCapability: (cpuModels, cpuLimits) => set({ cpuModels, cpuLimits }),
       toggleFavorite: (id) =>
         set({
           favorites: get().favorites.includes(id)

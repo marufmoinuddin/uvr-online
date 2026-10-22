@@ -33,10 +33,35 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-      - run: python -m py_compile main.py backend.py job_queue.py model_manager.py
+      - run: python -m py_compile main.py backend.py job_queue.py model_manager.py sep_worker.py
+
+  # CPU mode is a supported deployment, not a fallback nobody tests. The CPU
+  # wheels are a fraction of the CUDA ones, so this job stays quick — and it
+  # runs the REAL path: the device setting, the catalogue guard, and an
+  # actual separation whose stems are checked.
+  cpu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install CPU dependencies
+        run: pip install -r api/requirements-cpu.txt
+      - name: CPU-mode tests
+        env:
+          # Pinned so the job cannot pass by running on a GPU. The runner has
+          # no GPU, but the environment should say what it means.
+          UVR_DEVICE: cpu
+        run: python scripts/test-cpu-mode.py --full
 
   docker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: docker compose build
+      - name: Build the CPU worker image
+        # The CPU image is published separately (see docker.yml); building it
+        # here means a broken CPU Dockerfile fails the pull request rather
+        # than the release pipeline.
+        run: docker build -f api/Dockerfile.cpu -t uvr-api-cpu:ci api/

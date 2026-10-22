@@ -1,8 +1,8 @@
 # UVR Stack
 
 A local-first audio workbench — professional vocal removal, karaoke, stem
-splitting and corrective audio repair that runs **entirely on your own NVIDIA
-GPU**. No uploads, no watermarks, no usage caps, no API keys.
+splitting and corrective audio repair that runs **entirely on your own
+hardware**. No uploads, no watermarks, no usage caps, no API keys.
 
 A from-scratch reimplementation of the workflow at `uvrvocalremover.com`: the UI
 was rebuilt feature-for-feature against the reference, and the inference engine
@@ -13,8 +13,8 @@ upstream cannot load.
 | | |
 |---|---|
 | **Web** | Next.js 14 (App Router) · React 18 · TypeScript · Tailwind · Radix UI · Zustand |
-| **Worker** | FastAPI · audio-separator · PyTorch 2.8 + CUDA 12.8 · vendored MSST |
-| **Deploy** | Docker Compose with NVIDIA GPU passthrough |
+| **Worker** | FastAPI · audio-separator · PyTorch 2.8 (CUDA 12.8 or CPU) · vendored MSST |
+| **Deploy** | Docker Compose — with NVIDIA GPU passthrough, or CPU-only |
 
 ---
 
@@ -22,23 +22,62 @@ upstream cannot load.
 
 | | |
 |---|---|
-| **GPU** | **Required.** NVIDIA with the CUDA container toolkit. Verified on an RTX 2060 (≥ 4 GB VRAM). |
-| **Disk** | ~10 GB for the CUDA base image and torch wheels, plus ~4 GB of model weights as you use them. |
-| **Tooling** | Docker + NVIDIA Container Toolkit, or `uv` + Node 20 for dev mode. |
+| **GPU** | **Optional.** NVIDIA with the CUDA container toolkit. Verified on an RTX 2060 (≥ 4 GB VRAM). |
+| **CPU** | **Optional.** Any x86-64 CPU with 2+ cores. See [CPU mode](#cpu-mode) for the measured limits. |
+| **Disk** | ~10 GB for the CUDA base image and torch wheels, plus ~4 GB of model weights as you use them. ~4 GB for the CPU image. |
+| **Tooling** | Docker + NVIDIA Container Toolkit (GPU), or just Docker (CPU), or `uv` + Node 20 for dev mode. |
 
-### ⚠️ There is no CPU mode
+### CPU mode
 
-This is not a soft requirement. `audio-separator` will happily start on CPU and
-log `running in CPU mode` — then never finish. Measured on a **5-second** clip:
+CPU mode is **supported**, not a fallback that happens to exist. It was not
+always: the first CPU attempt ran with float16 autocast enabled and the
+models' default chunk overlap, and a **5-second** clip took over 40 minutes.
+Turning autocast off and halving the overlap brought the same job down to
+seconds.
 
-| Device | Time |
-|---|---|
-| GPU | **8.8 s** |
-| CPU | **killed at 40 minutes, never completed** |
+Measured on an **RTX 2060** + **16 vCPU** (8 physical cores) / 38 GB RAM,
+PyTorch 2.8, on a **5-second** stereo clip at 44.1 kHz:
 
-The same job logs 282 s / 275 s / 249 s per iteration on CPU, which extrapolates
-to *days* for one 3.5-minute song. The app deliberately does not offer a CPU
-toggle. If you have no NVIDIA GPU, this project is not for you.
+| Model | Architecture | GPU | CPU | CPU vs GPU | 2-min clip on CPU |
+|---|---|---|---|---|---|
+| `htdemucs_6s` | HTDemucs | 6.0 s | 8.4 s | 1.4× | ~3 min |
+| `htdemucs` | HTDemucs | 5.9 s | 8.5 s | 1.4× | ~3 min |
+| `uvr_2hp` | VR | 5.0 s | 9.7 s | 1.9× | ~4 min |
+| `mbr_guitar_becruily` | MelBand-RoFormer | 4.6 s | 13.3 s | 2.9× | ~5 min |
+
+**CPU mode supports a limited set of models. Others are disabled because they
+are too slow.** Exactly **4 of the catalogue's 45 models** are marked
+`cpuOk: true`; the picker shows the rest as "No CPU" and the worker refuses
+them before anything is uploaded.
+
+The cutoff, written down so it can be re-derived: **at most 15 s per 5 s clip**
+on the reference machine — which extrapolates to roughly 6 minutes for a
+2-minute clip, and sits well inside the 30-minute job timeout. The first
+rejected model, `htdemucs_ft`, takes 16.4 s for the same clip; the heaviest
+models (`mbr_duality_v1`, `mbr_instvox_duality_v2`) need 280 s, and the
+HyperACE pair — which runs through the vendored MSST path, a different and
+slower code path — needs 123–126 s.
+
+> The full table, with every model measured, is in
+> [docs/results/cpu-benchmark-2026-10-22.md](docs/results/cpu-benchmark-2026-10-22.md).
+> Reproduce it with `python3 scripts/benchmark-cpu.py`. The cutoff is one
+> constant in that file; raising it re-admits models from the measured table.
+
+CPU mode is bounded in two more ways:
+
+| Limit | Default | Env var |
+|---|---|---|
+| Longest clip | 120 s | `UVR_CPU_MAX_SECONDS` |
+| Largest upload | 64 MB | `UVR_CPU_MAX_BYTES` |
+| Job wall clock | 30 min | `UVR_CPU_JOB_TIMEOUT` |
+
+Over-long submissions are **refused up front**, with the limit quoted — not
+accepted and then left stalling the queue. Models that were measured to be too
+slow are refused the same way, and the picker marks them "No CPU" so you never
+have to discover it after uploading.
+
+Minimum sensible hardware: **2 cores, 4 GB RAM** (8 GB if you want the
+Demucs models, which are the memory-hungry ones).
 
 ---
 
@@ -53,7 +92,7 @@ cp .env.example .env
 
 # verify
 curl localhost:3000/api/health   # web  → proxied to the worker
-curl localhost:8000/api/health   # worker → {"gpu":true,...}
+curl localhost:8000/api/health   # worker → {"gpu":true,"device":"cuda",...}
 ```
 
 The first build pulls the CUDA base image (~6 GB) and installs torch cu128, so
@@ -62,6 +101,21 @@ budget 15–20 minutes. Later rebuilds are much faster — but editing
 
 Results land in `./output`, model weights in `./models`, and input audio is read
 read-only from `~/music`.
+
+### Quick start (Docker, CPU-only)
+
+No NVIDIA GPU? Use the CPU override — a slim Python base image with the CPU
+torch wheels, roughly a gigabyte smaller and no CUDA runtime at all:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d --build
+curl localhost:8000/api/health   # → {"gpu":false,"device":"cpu","cpuMode":true,...}
+```
+
+The override replaces the `api` service rather than adding a second one: the
+GPU reservation is cleared, the image is `api/Dockerfile.cpu`, and `UVR_DEVICE`
+is pinned to `cpu`. Everything else — the web container, the volumes, the
+model store — is inherited, so the two stacks behave identically.
 
 ## Quick start (dev, no Docker)
 
@@ -72,6 +126,9 @@ process start instead of a ~15 minute image rebuild.
 # 1. worker — uv provisions a matching interpreter + torch cu128 on first run
 cd ~/docker/uvr-stack/api
 ./run-local.sh                 # http://localhost:8000  (PORT=8001 to override)
+
+# ... or CPU-only, in a separate venv with the CPU torch wheels:
+./run-local.sh --cpu
 
 # 2. web
 cd ~/docker/uvr-stack/web
@@ -85,6 +142,10 @@ container runs as root, so its output comes back root-owned and the host user
 then cannot create the next job's upload directory. Dev writes to
 `./output-local` instead. There is no `--reload` — restart the process after
 editing anything under `api/`.
+
+`--cpu` uses its own `.venv-cpu` rather than re-syncing `.venv`: the CUDA and
+CPU wheels are different builds of the same torch version, and swapping one for
+the other in place means re-downloading ~3 GB every time you switch.
 
 > Both stacks claim ports 3000 and 8000. If `./run-local.sh` exits with a bind
 > error, a compose container already holds the port: `docker compose stop`.
@@ -222,10 +283,15 @@ returns different bytes is caught rather than silently used.
 is persisted as JSON and files on disk (`OUTPUT_ROOT/jobs.json`,
 `MODEL_STORE/*/manifest.json`).
 
-Jobs are processed **serially** on the GPU. The browser subscribes to `/ws/jobs`
-for live progress and falls back to backoff polling (2 s → 30 s) while the socket
-is down. Ready jobs expose per-stem URLs with HTTP **Range** enabled so playback
-can seek, plus a bundle download as `zip` / `wav` / `flac` / `mp3`.
+Jobs are processed **serially**, one at a time, on whichever device the worker
+is configured for. The browser subscribes to `/ws/jobs` for live progress and
+falls back to backoff polling (2 s → 30 s) while the socket is down. Ready jobs
+expose per-stem URLs with HTTP **Range** enabled so playback can seek, plus a
+bundle download as `zip` / `wav` / `flac` / `mp3`.
+
+Each separation runs in its own **child process**, so a cancelled or timed-out
+job is genuinely stopped rather than left burning CPU in the background — and a
+native crash inside torch takes down the child, not the API.
 
 Full detail — including why HyperACE routing has to be decided *before* a model
 is handed to audio-separator — is in
@@ -239,7 +305,7 @@ is handed to audio-separator — is in
 
 | | |
 |---|---|
-| `GET /api/health` | GPU name, free VRAM, queue depth |
+| `GET /api/health` | GPU name, free VRAM, queue depth, **active device**, CPU thread budget, CPU model list and limits |
 | `GET /api/instruments` | Instrument targets, derived from each model's own metadata |
 | `GET /api/models` · `/api/models/storage` · `/api/models/{id}` | Catalogue, live install status, on-disk size |
 | `POST /api/models/{id}/download` · `/cancel` · `DELETE /api/models/{id}` | Manage weights |
@@ -290,25 +356,29 @@ release → typecheck, lint, build and a browser smoke test.
 
 ## Docker images
 
-`.github/workflows/docker.yml` builds both images on every push and pushes them
-to GHCR using the automatic `GITHUB_TOKEN`, so there is no registry secret to
-configure.
+`.github/workflows/docker.yml` builds all three images on every push and pushes
+them to GHCR using the automatic `GITHUB_TOKEN`, so there is no registry secret
+to configure.
 
 | Image | Context | Base |
 |---|---|---|
 | `uvr-api` | `./api` | `nvidia/cuda:12.8.0-cudnn-devel-ubuntu22.04` |
+| `uvr-api-cpu` | `./api` (`Dockerfile.cpu`) | `python:3.10-slim-bookworm` — CPU torch wheels, no CUDA runtime |
 | `uvr-web` | `./web` | `node:20-alpine` |
 
 Tagged with the long commit SHA on every commit, plus `<branch>` and `latest` on
 the default branch only. `.github/workflows/ci.yml` separately runs lint,
-typecheck and build on pushes to `main` and on every pull request.
+typecheck and build on pushes to `main` and on every pull request, builds both
+worker images, and runs the CPU-mode test suite end to end.
 
 ---
 
 ## Known limitations
 
-- **No CPU mode.** See [Requirements](#requirements). Not a preference — a CPU run
-  effectively never terminates.
+- **CPU mode is slower and more limited.** A CPU run is 1.5–7× slower than a
+  GPU run, so CPU mode caps the clip length, the upload size and the job
+  wall clock, and refuses the models that were measured to be too slow. See
+  [CPU mode](#cpu-mode). It is a real mode, not a token one.
 - **Audio repair quality is unverified.** The code ships and works; whether it
   improves audio is unproven. See
   [docs/AUDIO-REPAIR-GAP.md](docs/AUDIO-REPAIR-GAP.md).

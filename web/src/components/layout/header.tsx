@@ -123,7 +123,7 @@ export function Header() {
                 </TooltipTrigger>
                 <TooltipContent>
                   {onCpu
-                    ? "No usable GPU detected. Audio Repair still works normally (it is CPU-only by design), but model separation runs on the CPU and is impractically slow — a few seconds of audio can take hours."
+                    ? "No GPU is being used. Separation runs on the CPU: slower than the GPU (1.5–7× depending on the model), so CPU mode caps the clip length and refuses the heaviest models. The lighter models still finish a short clip in seconds."
                     : "Runs entirely on your own GPU — no accounts, no credits, no limits."}
                 </TooltipContent>
               </Tooltip>

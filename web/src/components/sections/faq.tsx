@@ -12,11 +12,11 @@ import {
 const FAQS = [
   {
     q: "Is my audio uploaded anywhere?",
-    a: "No. UVR Local runs entirely on your own GPU. Your files never leave your machine — separation, ensemble and downloads all happen locally.",
+    a: "No. UVR Local runs entirely on your own machine — GPU or CPU. Your files never leave it: separation, ensemble and downloads all happen locally.",
   },
   {
     q: "What hardware do I need?",
-    a: "Any NVIDIA GPU with at least 4 GB VRAM works well. An RTX 2060 (like the one this stack runs on) processes a 3-minute song in well under a minute. CPU-only mode is supported but slower.",
+    a: "Any NVIDIA GPU with at least 4 GB VRAM works well. An RTX 2060 (like the one this stack runs on) processes a 3-minute song in well under a minute. CPU-only mode is supported too: it is 1.5–7× slower depending on the model, so it caps the clip length and refuses the heaviest models, but a short clip still separates in seconds.",
   },
   {
     q: "Which models are included?",

@@ -62,6 +62,28 @@ export function ModelSelectionCard({ scene, className, instrumentTarget = null }
   const models = useStore((s) => s.modelCatalog);
   const selectedModelId = useStore((s) => s.selectedModelId);
   const selectModel = useStore((s) => s.selectModel);
+  const device = useStore((s) => s.device);
+  const cpuModels = useStore((s) => s.cpuModels);
+  const cpuLimits = useStore((s) => s.cpuLimits);
+
+  // CPU mode changes what can be run at all, so the picker has to know about
+  // it before the user picks a model and waits for a refusal.
+  const onCpu = device === "cpu";
+  /**
+   * Can this model run on a CPU?
+   *
+   * The worker's own list wins when it has answered — it is the component
+   * that will actually refuse the job. The catalogue's own `cpuOk` flag is the
+   * fallback, and the two are kept in sync by scripts/verify-catalog.py.
+   */
+  const cpuCapable = React.useCallback(
+    (m: Model) => {
+      if (!onCpu) return true;
+      if (cpuModels.length > 0) return cpuModels.includes(m.id);
+      return m.cpuOk === true;
+    },
+    [onCpu, cpuModels],
+  );
 
   const [query, setQuery] = React.useState("");
   const [usage, setUsage] = React.useState<string>(ALL_USAGE);
@@ -172,6 +194,26 @@ export function ModelSelectionCard({ scene, className, instrumentTarget = null }
         </div>
       </div>
 
+      {/* CPU mode notice. Shown before the grid, not as a toast: it changes
+          what the user can pick, so it has to be where the choice happens. */}
+      {onCpu && (
+        <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] px-3 py-2 text-xs text-amber-200">
+          <Cpu className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
+          <p className="leading-relaxed">
+            <span className="font-semibold">CPU mode — much slower than the GPU.</span>{" "}
+            Only the models measured to be usable on a CPU can be selected
+            (the rest are marked &quot;No CPU&quot;).
+            {cpuLimits
+              ? ` Clips are limited to ${cpuLimits.maxSeconds}s and files to ${Math.round(
+                  cpuLimits.maxBytes / (1024 * 1024),
+                )} MB, and a job that exceeds ${Math.round(
+                  cpuLimits.timeoutSeconds / 60,
+                )} minutes is stopped.`
+              : ""}
+          </p>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Select value={usage} onValueChange={setUsage}>
@@ -273,6 +315,7 @@ export function ModelSelectionCard({ scene, className, instrumentTarget = null }
             model={m}
             selected={m.id === selectedModelId}
             favorite={favorites.includes(m.id)}
+            cpuBlocked={!cpuCapable(m)}
             onSelect={() => selectModel(m.id)}
             onToggleFavorite={() => toggleFavorite(m.id)}
           />
@@ -293,12 +336,15 @@ function ModelRow({
   model,
   selected,
   favorite,
+  cpuBlocked,
   onSelect,
   onToggleFavorite,
 }: {
   model: Model;
   selected: boolean;
   favorite: boolean;
+  /** The worker is in CPU mode and will refuse this model. */
+  cpuBlocked: boolean;
   onSelect: () => void;
   onToggleFavorite: () => void;
 }) {
@@ -311,17 +357,24 @@ function ModelRow({
     <div
       className={cn(
         "group relative flex h-[76px] flex-col rounded-xl border px-3 py-2 transition-colors",
-        selected
-          ? "border-indigo-400/40 bg-indigo-500/[0.08]"
-          : "border-white/[0.06] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.04]",
+        cpuBlocked
+          ? "border-white/[0.04] bg-white/[0.01] opacity-50"
+          : selected
+            ? "border-indigo-400/40 bg-indigo-500/[0.08]"
+            : "border-white/[0.06] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.04]",
       )}
     >
       <button
         type="button"
         onClick={onSelect}
-        className="flex min-w-0 flex-1 flex-col justify-between pr-7 text-left focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50 rounded-lg"
+        disabled={cpuBlocked}
+        className="flex min-w-0 flex-1 flex-col justify-between pr-7 text-left focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50 disabled:cursor-not-allowed rounded-lg"
         aria-pressed={selected}
-        aria-label={`${model.name} ${model.arch} ${trait} ${usage}`}
+        aria-label={
+          cpuBlocked
+            ? `${model.name} ${model.arch} — not available in CPU mode`
+            : `${model.name} ${model.arch} ${trait} ${usage}`
+        }
       >
         <span className="min-w-0">
           <span
@@ -347,6 +400,14 @@ function ModelRow({
           {model.recommended && (
             <span className="shrink-0 rounded-md bg-emerald-500/15 px-1.5 py-px text-[10px] font-semibold text-emerald-400">
               Recommended
+            </span>
+          )}
+          {cpuBlocked && (
+            <span
+              title="This model is too slow to run on a CPU. The worker will refuse it."
+              className="shrink-0 rounded-md bg-amber-500/15 px-1.5 py-px text-[10px] font-semibold text-amber-400"
+            >
+              No CPU
             </span>
           )}
           <span

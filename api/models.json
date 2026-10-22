@@ -410,6 +410,7 @@
     "registry": "2_HP-UVR.pth",
     "name": "2 HP UVR",
     "arch": "VR",
+    "cpuOk": true,
     "target": "dual",
     "tags": [
       "full band"
@@ -616,6 +617,7 @@
     "registry": "htdemucs.yaml",
     "name": "HTDemucs",
     "arch": "HTDemucs",
+    "cpuOk": true,
     "target": "4-stem",
     "tags": [
       "balanced"
@@ -661,6 +663,7 @@
     "registry": "htdemucs_6s.yaml",
     "name": "HTDemucs 6-Source",
     "arch": "HTDemucs",
+    "cpuOk": true,
     "target": "multi",
     "tags": [
       "dual stems"
@@ -956,6 +959,7 @@
   "mbr_guitar_becruily": {
     "name": "Guitar (becruily)",
     "arch": "MelBand-RoFormer",
+    "cpuOk": true,
     "target": "instrumental",
     "tags": [
       "detailed split"

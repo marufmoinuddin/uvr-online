@@ -124,6 +124,10 @@ def parse_ui_catalog(source: str) -> dict:
             "unsupported": "unsupported" in obj,
             "ensemble": (_field(obj, "ensemble") or "").lower() == "true",
             "target": _field(obj, "target"),
+            # Whether the model may run in CPU mode. ABSENT MEANS FALSE — the
+            # safe default — so only the explicitly-true models count. The
+            # worker treats a missing flag exactly the same way.
+            "cpuOk": (_field(obj, "cpuOk") or "").lower() == "true",
             # Instrument stems this model was OBSERVED to emit. The Instrument
             # Extractor scene offers exactly this set, so a mismatch between the
             # two catalogs means the picker advertises a stem the worker will
@@ -219,6 +223,40 @@ def main() -> int:
             "unsupported: flags differ between catalogs",
             f"worker-only={only_w or '-'} ui-only={only_u or '-'}",
         )
+
+    # 2b. CPU-capability parity --------------------------------------------
+    # The worker REFUSES a model in CPU mode unless the catalogue says it may
+    # run there. If the two catalogs disagree, the picker either offers a
+    # model the worker will reject after the upload, or hides one that works.
+    w_cpu = {i for i, m in worker.items() if m.get("cpuOk")}
+    u_cpu = {i for i, m in ui_models.items() if m["cpuOk"]}
+    if w_cpu == u_cpu:
+        check(
+            OK,
+            "cpu: CPU-capable flags match in both files",
+            f"{len(w_cpu)} flagged",
+        )
+    else:
+        only_w = sorted(w_cpu - u_cpu)
+        only_u = sorted(u_cpu - w_cpu)
+        check(
+            FAIL,
+            "cpu: CPU-capable flags differ between catalogs",
+            f"worker-only={only_w or '-'} ui-only={only_u or '-'}",
+        )
+
+    # A model that cannot run at all must not also be advertised as
+    # CPU-capable: the worker refuses it for a different reason, but the UI
+    # would show it as available on a CPU.
+    bad_cpu = sorted(i for i in w_cpu if worker[i].get("unsupported"))
+    if bad_cpu:
+        check(
+            FAIL,
+            "cpu: unsupported models are marked CPU-capable",
+            ", ".join(bad_cpu),
+        )
+    else:
+        check(OK, "cpu: no unsupported model is marked CPU-capable")
 
     # 3. fetchability ------------------------------------------------------
     unfetchable = [

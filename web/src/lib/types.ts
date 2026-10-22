@@ -89,6 +89,14 @@ export interface Model {
    */
   unsupported?: string | null;
   /**
+   * True when this model was MEASURED to run on a CPU in a reasonable time.
+   *
+   * The worker refuses the others in CPU mode, so the picker marks them
+   * rather than offering a model that would then be rejected after the
+   * upload. Absent means "not CPU-capable" — the safe default.
+   */
+  cpuOk?: boolean;
+  /**
    * Instrument stems this model has been OBSERVED to emit, used by the
    * Instrument Extractor scene. Populated from probe output filenames, never
    * from the checkpoint's advertised capabilities — a model offering "piano"

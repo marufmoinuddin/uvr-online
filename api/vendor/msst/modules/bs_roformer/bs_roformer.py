@@ -441,7 +441,7 @@ class MaskEstimatorFNO(Module):
 
 		for band_features, mlp in zip(x, self.to_freqs):
 			band_features = rearrange(band_features, 'b t c -> b c t')
-			with torch.autocast(device_type='cuda', enabled=False, dtype=torch.float32):
+			with torch.autocast(device_type=band_features.device.type, enabled=False, dtype=torch.float32):
 				freq_out = mlp(band_features).float()
 			freq_out = rearrange(freq_out, 'b c t -> b t c')
 			outs.append(freq_out)

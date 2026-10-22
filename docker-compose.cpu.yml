@@ -12,6 +12,7 @@
 # inherited from docker-compose.yml, so the two stacks behave identically.
 services:
   api:
+    image: ${UVR_API_CPU_IMAGE:-ghcr.io/marufmoinuddin/uvr-api-cpu:latest}
     build:
       context: ./api
       dockerfile: Dockerfile.cpu

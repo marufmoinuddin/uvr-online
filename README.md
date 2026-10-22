@@ -87,11 +87,12 @@ have to discover it after uploading.
 
 ---
 
-## Quick start (Docker)
+## Quick start (prebuilt Docker images)
 
 ```bash
 cd /path/to/uvr-online
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 
 # optional — every value already has a working default
 cp .env.example .env
@@ -101,9 +102,8 @@ curl localhost:3000/api/health   # web  → proxied to the worker
 curl localhost:8000/api/health   # worker → {"gpu":true,"device":"cuda",...}
 ```
 
-The first build pulls the CUDA base image (~6 GB) and installs torch cu128, so
-budget 15–20 minutes. Later rebuilds are much faster — but editing
-`api/requirements.txt` invalidates the pip layer and reinstalls everything.
+The default images are published to GHCR. Set `UVR_WEB_IMAGE` and
+`UVR_API_IMAGE` if you use a mirror or a different image tag.
 
 Results land in `./output`, model weights in `./models`, and input audio is read
 read-only from `~/music`.
@@ -114,7 +114,8 @@ No NVIDIA GPU? Use the CPU override — a slim Python base image with the CPU
 torch wheels, roughly a gigabyte smaller and no CUDA runtime at all:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.cpu.yml pull
+docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d
 curl localhost:8000/api/health   # → {"gpu":false,"device":"cpu","cpuMode":true,...}
 ```
 
@@ -122,6 +123,23 @@ The override replaces the `api` service rather than adding a second one: the
 GPU reservation is cleared, the image is `api/Dockerfile.cpu`, and `UVR_DEVICE`
 is pinned to `cpu`. Everything else — the web container, the volumes, the
 model store — is inherited, so the two stacks behave identically.
+
+## Optional: build images locally
+
+Use local builds when developing the image, testing unreleased changes, or
+running from a fork that does not publish the default GHCR images.
+
+```bash
+cd /path/to/uvr-online
+docker compose up -d --build
+
+# CPU-only
+docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d --build
+```
+
+The first GPU build pulls the CUDA base image (~6 GB) and installs torch cu128,
+so budget 15–20 minutes. Later rebuilds are faster, but editing
+`api/requirements.txt` invalidates the pip layer and reinstalls everything.
 
 ## Quick start (dev, no Docker)
 

@@ -1,5 +1,6 @@
 services:
   web:
+    image: ${UVR_WEB_IMAGE:-ghcr.io/marufmoinuddin/uvr-web:latest}
     build:
       context: ./web
       args:
@@ -22,6 +23,7 @@ services:
       - api
 
   api:
+    image: ${UVR_API_IMAGE:-ghcr.io/marufmoinuddin/uvr-api:latest}
     build: ./api
     ports:
       - "8000:8000"

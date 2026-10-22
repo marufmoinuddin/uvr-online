@@ -12,28 +12,34 @@
 # build from PyPI.
 
 # --- PyTorch (CPU) ---
-# The CPU index is the PRIMARY index and PyPI is the EXTRA, in that order.
-# This ordering matters and is not interchangeable:
+# The CPU index is the PRIMARY index and PyPI is the EXTRA. Two rules worth
+# knowing before touching this:
 #
-#   * The `+cpu` local version tag exists ONLY on download.pytorch.org. PyPI
-#     has plain `torch==2.8.0` and newer. With PyPI as a co-equal or primary
-#     index, pip's candidate list is the union and the `==2.8.0+cpu` pin never
-#     matches, because pip prefers the highest release and the CPU-only build
-#     loses to PyPI's plain builds.
-#   * A SECOND `--index-url` line is silently ignored by pip (only the last
-#     one wins), so the "CPU index then PyPI" spelling does NOT work — it
-#     drops the CPU index and the resolve fails with "No matching
-#     distribution found for torch==2.8.0+cpu".
+#   * The `+cpu` local version tag exists ONLY on download.pytorch.org —
+#     PyPI hosts plain `torch==2.8.0`. The CPU index has to be listed
+#     explicitly or the exact `==2.8.0+cpu` pin fails with "No matching
+#     distribution found".
+#   * A SECOND `--index-url` line is silently ignored by pip — only the last
+#     one wins. Ordering indexes works only as --index-url (first) +
+#     --extra-index-url (rest). Writing "CPU index, then PyPI" as two
+#     --index-url lines quietly drops the CPU index entirely.
 #
-# With the CPU index first as --index-url and PyPI second as
-# --extra-index-url, pip consults the CPU index first and resolves the
-# pinned 2.8.0+cpu triple (verified: torch-2.8.0+cpu,
-# torchvision-0.23.0+cpu, torchaudio-2.8.0+cpu all resolve on cp310). Every
-# non-torch package still resolves from PyPI, which is second.
+# The primary/extra order here is defensive rather than strictly required:
+# the exact +cpu pin resolves either way round (CI installed it with the CPU
+# index as the extra too), but keeping the CPU index first means an unpinned
+# torch-shaped requirement can never pull a CUDA build from PyPI into a
+# CPU-only image — unpinned resolution is exactly where a CPU image silently
+# grows a 3 GB `cuda-toolkit` dependency.
 #
-# The 2.8.0+cpu wheels exist for cp310 on manylinux_2_28_x86_64, so this
-# matches api/requirements.txt (torch 2.8.0+cu128) — the two images run the
-# same torch minor and differ only in the build (CPU vs CUDA).
+# Verified on Python 3.10 (the interpreter the image and CI both use):
+# torch-2.8.0+cpu, torchvision-0.23.0+cpu and torchaudio-2.8.0+cpu resolve
+# from manylinux_2_28_x86_64 and NO CUDA packages are pulled in. Beware
+# testing this file under a newer Python: there is no cp314 wheel for torch
+# 2.8.0, so a resolve under 3.14 fails with "No matching distribution" even
+# though the file is correct — easy to misread as an index bug.
+#
+# This matches api/requirements.txt (torch 2.8.0+cu128) — the two images run
+# the same torch minor and differ only in the build (CPU vs CUDA).
 --index-url https://download.pytorch.org/whl/cpu
 --extra-index-url https://pypi.org/simple
 torch==2.8.0+cpu

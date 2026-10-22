@@ -12,11 +12,30 @@
 # build from PyPI.
 
 # --- PyTorch (CPU) ---
-# Index options MUST be on their own line: pip ignores an inline
-# `--index-url`, then looks for +cpu builds on PyPI, which has none, and the
-# build fails. Use --extra-index-url (not --index-url) so PyPI stays
-# available for the non-torch packages below.
---extra-index-url https://download.pytorch.org/whl/cpu
+# The CPU index is the PRIMARY index and PyPI is the EXTRA, in that order.
+# This ordering matters and is not interchangeable:
+#
+#   * The `+cpu` local version tag exists ONLY on download.pytorch.org. PyPI
+#     has plain `torch==2.8.0` and newer. With PyPI as a co-equal or primary
+#     index, pip's candidate list is the union and the `==2.8.0+cpu` pin never
+#     matches, because pip prefers the highest release and the CPU-only build
+#     loses to PyPI's plain builds.
+#   * A SECOND `--index-url` line is silently ignored by pip (only the last
+#     one wins), so the "CPU index then PyPI" spelling does NOT work — it
+#     drops the CPU index and the resolve fails with "No matching
+#     distribution found for torch==2.8.0+cpu".
+#
+# With the CPU index first as --index-url and PyPI second as
+# --extra-index-url, pip consults the CPU index first and resolves the
+# pinned 2.8.0+cpu triple (verified: torch-2.8.0+cpu,
+# torchvision-0.23.0+cpu, torchaudio-2.8.0+cpu all resolve on cp310). Every
+# non-torch package still resolves from PyPI, which is second.
+#
+# The 2.8.0+cpu wheels exist for cp310 on manylinux_2_28_x86_64, so this
+# matches api/requirements.txt (torch 2.8.0+cu128) — the two images run the
+# same torch minor and differ only in the build (CPU vs CUDA).
+--index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://pypi.org/simple
 torch==2.8.0+cpu
 torchvision==0.23.0+cpu
 torchaudio==2.8.0+cpu

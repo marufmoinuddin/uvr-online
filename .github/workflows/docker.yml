@@ -46,6 +46,12 @@ jobs:
         include:
           - image: api
             context: ./api
+          # The CPU worker: same application, slim base image, CPU torch
+          # wheels, no CUDA runtime. Published alongside the GPU image so a
+          # machine without an NVIDIA card can pull and run the stack.
+          - image: api-cpu
+            context: ./api
+            dockerfile: ./api/Dockerfile.cpu
           - image: web
             context: ./web
             # Mirrors the compose default. NEXT_PUBLIC_* is inlined into the
@@ -94,7 +100,9 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
-          file: ${{ matrix.context }}/Dockerfile
+          # Default to <context>/Dockerfile; the CPU worker lives beside it
+          # under a different name.
+          file: ${{ matrix.dockerfile || format('{0}/Dockerfile', matrix.context) }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

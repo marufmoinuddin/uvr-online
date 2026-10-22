@@ -2,9 +2,17 @@
 
 ## Prerequisites
 
+**With a GPU:**
+
 - Docker with the **NVIDIA Container Toolkit** (`nvidia-ctk runtime configure`)
 - An NVIDIA GPU (≥ 4 GB VRAM recommended; verified on RTX 2060)
 - ~10 GB free disk for the CUDA base image and the torch cu128 wheels
+
+**Without a GPU (CPU mode):**
+
+- Docker (no NVIDIA toolkit needed)
+- 2+ CPU cores, 4 GB RAM
+- ~4 GB free disk for the CPU image and the torch CPU wheels
 
 Inference is self-contained — there is no MSST-WebUI checkout to install or mount.
 
@@ -18,12 +26,27 @@ docker compose up -d --build
 cp .env.example .env
 ```
 
+### CPU-only
+
+On a machine with no NVIDIA GPU, use the override file. It replaces the `api`
+service with the CPU image, clears the GPU device reservation, and pins the
+worker to the CPU:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d --build
+```
+
+> The override is a separate file rather than a Compose **profile** on purpose:
+> Compose *merges* files, so a second `api` service declared under a `cpu`
+> profile would be merged into the GPU one rather than replacing it — and both
+> would try to bind port 8000.
+
 Services:
 
 | Service | Port | Notes |
 |---------|------|-------|
 | `web` | 3000 | Next.js standalone build, runs `node server.js` |
-| `api` | 8000 | FastAPI worker, NVIDIA device reservation |
+| `api` | 8000 | FastAPI worker, NVIDIA device reservation (CPU override: no reservation, `UVR_DEVICE=cpu`) |
 
 Host bind mounts (no named volumes):
 
@@ -47,6 +70,17 @@ curl -s localhost:8000/api/health    # {"gpu":true,"gpuName":"NVIDIA GeForce RTX
 curl -s localhost:8000/api/models | head -c 200
 curl -s localhost:3000 | head        # HTML
 ```
+
+On a CPU-only stack the health endpoint reports `"device":"cpu"`,
+`"cpuMode":true`, the CPU thread budget, the list of CPU-capable models and
+the CPU-mode limits — all of which the UI reads to label what it can run.
+
+CPU mode supports a **limited set of models** (the ones measured to finish a
+2-minute clip in roughly 5–6 minutes). Others are disabled because they are
+too slow; the picker marks them "No CPU" and the worker refuses them up
+front. The current set and the cutoff are in
+[README](../README.md#cpu-mode) and the
+[benchmark results](results/cpu-benchmark-2026-10-22.md).
 
 ## Bare metal (no Docker)
 

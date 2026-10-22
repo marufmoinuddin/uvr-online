@@ -182,6 +182,13 @@ class ModelRecord:
     # Name of the equivalent model in audio-separator's own registry. Used as a
     # fallback when we have no direct download spec for this catalog entry.
     registry: Optional[str] = None
+    # Can this model run on the CPU in a reasonable time?
+    #
+    # DECIDED BY MEASUREMENT, not by architecture name: the flag is set from a
+    # benchmark (scripts/benchmark-cpu.py) rather than guessed from the model
+    # family. A model that is too slow on a CPU is refused up front with an
+    # explanation instead of being offered and then running for hours.
+    cpu_ok: bool = False
     # Instruments this model can isolate, observed from a real run. Used by the
     # Instrument Extractor scene so it never offers a target the model cannot
     # actually emit.
@@ -327,6 +334,7 @@ class ModelManager:
                 ensemble=bool(e.get("ensemble")),
                 unsupported=e.get("unsupported") or None,
                 registry=e.get("registry") or None,
+                cpu_ok=bool(e.get("cpuOk", False)),
                 instrument_targets=e.get("instrumentTargets", []),
                 repair=e.get("repair") or None,
             )
@@ -441,6 +449,9 @@ class ModelManager:
                     "ensemble": rec.ensemble,
                     "unsupported": rec.unsupported,
                     "registry": rec.registry,
+                    # Whether this model may run in CPU mode. The UI hides or
+                    # labels the others so nobody submits an hour-long job.
+                    "cpuOk": rec.cpu_ok,
                     # Consumed by the Instrument Extractor scene: a model only
                     # appears as a candidate for a stem it was observed to emit.
                     "instrumentTargets": rec.instrument_targets or None,

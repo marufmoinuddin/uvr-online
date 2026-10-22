@@ -22,9 +22,17 @@ export function formatDuration(sec: number): string {
 
 export function formatEta(sec: number): string {
   if (sec < 60) return `${Math.ceil(sec)}s`;
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
-  return `${m}m ${s}s`;
+  // A CPU job can legitimately take hours — the mode caps the clip length,
+  // but a slow model on a slow machine is still minutes-to-hours. "47m 0s"
+  // hides how long that really is.
+  if (sec < 3600) {
+    const m = Math.floor(sec / 60);
+    const s = Math.round(sec % 60);
+    return `${m}m ${s}s`;
+  }
+  const h = Math.floor(sec / 3600);
+  const m = Math.round((sec % 3600) / 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
 export function timeAgo(ts: number): string {

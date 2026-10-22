@@ -1,0 +1,71 @@
+# UVR Local CPU worker — Python 3.10
+#
+# The CPU counterpart of requirements.txt: same application, same model
+# catalogue, same API — but torch from the CPU wheel index and no CUDA
+# runtime at all. It is what the `cpu` compose profile and `run-local.sh
+# --cpu` use.
+#
+# Kept as a separate file rather than a build argument on requirements.txt
+# because the difference is not just a URL: the CPU image also drops the
+# onnxruntime-gpu wheel for the much smaller CPU one, and pinning torch to
+# the `+cpu` local version is what keeps pip from quietly resolving the CUDA
+# build from PyPI.
+
+# --- PyTorch (CPU) ---
+# The CPU index is the PRIMARY index and PyPI is the EXTRA, in that order.
+# This ordering matters and is not interchangeable:
+#
+#   * The `+cpu` local version tag exists ONLY on download.pytorch.org. PyPI
+#     has plain `torch==2.8.0` and newer. With PyPI as a co-equal or primary
+#     index, pip's candidate list is the union and the `==2.8.0+cpu` pin never
+#     matches, because pip prefers the highest release and the CPU-only build
+#     loses to PyPI's plain builds.
+#   * A SECOND `--index-url` line is silently ignored by pip (only the last
+#     one wins), so the "CPU index then PyPI" spelling does NOT work — it
+#     drops the CPU index and the resolve fails with "No matching
+#     distribution found for torch==2.8.0+cpu".
+#
+# With the CPU index first as --index-url and PyPI second as
+# --extra-index-url, pip consults the CPU index first and resolves the
+# pinned 2.8.0+cpu triple (verified: torch-2.8.0+cpu,
+# torchvision-0.23.0+cpu, torchaudio-2.8.0+cpu all resolve on cp310). Every
+# non-torch package still resolves from PyPI, which is second.
+#
+# The 2.8.0+cpu wheels exist for cp310 on manylinux_2_28_x86_64, so this
+# matches api/requirements.txt (torch 2.8.0+cu128) — the two images run the
+# same torch minor and differ only in the build (CPU vs CUDA).
+--index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://pypi.org/simple
+torch==2.8.0+cpu
+torchvision==0.23.0+cpu
+torchaudio==2.8.0+cpu
+
+# --- API ---
+fastapi==0.115.0
+uvicorn[standard]==0.34.0
+python-multipart==0.0.12
+websockets==13.1
+python-dotenv==1.0.1
+
+# --- Audio / DSP ---
+# audio-separator requires numpy>=2 and librosa>=0.10, so these are no longer
+# held back at the older 1.x / 0.9 releases.
+numpy>=2,<3
+scipy>=1.11
+soundfile>=0.12
+librosa>=0.10,<0.12
+safetensors>=0.4
+
+# --- Inference (standalone) ---
+# The `cpu` extra pulls onnxruntime (CPU). The `gpu` extra pulls
+# onnxruntime-gpu, which is several hundred megabytes of CUDA libraries for
+# nothing on a machine with no GPU.
+audio-separator[cpu]>=0.40,<0.50
+
+# --- Bundled MSST inference (HyperACE etc.) ---
+# api/vendor/msst carries MSST-WebUI's own BS-RoFormer implementation so the
+# app can run checkpoints audio-separator cannot (notably the HyperACE
+# variants, which use FNO layers). Requires neuraloperator for those layers.
+neuraloperator>=2.0.0
+beartype>=0.18.5
+rotary-embedding-torch>=0.6.1

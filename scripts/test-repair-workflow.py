@@ -107,8 +107,45 @@ def wav_info(data: bytes) -> tuple[int, int, float]:
     return rate, ch, peak
 
 
+def _ensure_fixture(path: Path) -> bool:
+    """Make sure the probe clip exists, generating it if it does not.
+
+    The workflow test needs a decodable audio file to push through the API —
+    it checks the workflow's stage order, stem resolution and the one-output
+    contract, not the repair quality. Nothing in the repo generated this file,
+    so on a clean machine the test could only ever report "missing /tmp/probe"
+    and never actually test anything.
+
+    A short sine mix is enough: the neural repair step runs on it, and the
+    assertions are about the workflow, not about the audio.
+    """
+    if path.exists():
+        return True
+    try:
+        import numpy as np
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        rate, seconds = 44100, 4
+        t = np.arange(rate * seconds, dtype=np.float32) / rate
+        mono = (
+            0.30 * np.sin(2 * np.pi * 220.0 * t)
+            + 0.20 * np.sin(2 * np.pi * 440.0 * t)
+            + 0.15 * np.sin(2 * np.pi * 554.0 * t)
+        ).astype(np.float32)
+        pcm = (mono * 32767).astype("<i2").tobytes()
+        with wave.open(str(path), "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(rate)
+            w.writeframes(pcm)
+    except Exception as exc:  # noqa: BLE001
+        print(f"could not create the probe fixture: {exc}")
+        return False
+    return True
+
+
 def main() -> int:
-    if not (PROBE / "probe_clip.wav").exists():
+    if not _ensure_fixture(PROBE / "probe_clip.wav"):
         check(False, "probe fixtures present", f"missing {PROBE}")
         return 1
     clip = PROBE / "probe_clip.wav"

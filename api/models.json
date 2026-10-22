@@ -97,6 +97,7 @@
     "license": "UNSPECIFIED"
   },
   "bs_polarformer_vocals": {
+    "unsupported": "Its bs_siamese checkpoint uses LayerNorm gamma and y_attn weights that audio-separator's BS-RoFormer does not implement, so the state dict never loads.",
     "download": {
       "repo": "noblebarkrr/mvsepless_resources",
       "revision": "030a01aa951b3908ed6b01b2e507c17953300c2d",
@@ -211,6 +212,7 @@
     "license": "UNSPECIFIED"
   },
   "mel_band_roformer_fv8b": {
+    "unsupported": "Fails to load with this backend - audio-separator's checkpoint loader exits before inference, on both GPU and CPU.",
     "registry": "mel_band_roformer_instrumental_fv8b_gabox.ckpt",
     "name": "Mel-Band RoFormer Fv8b",
     "arch": "MelBand-RoFormer",
@@ -410,6 +412,7 @@
     "registry": "2_HP-UVR.pth",
     "name": "2 HP UVR",
     "arch": "VR",
+    "cpuOk": true,
     "target": "dual",
     "tags": [
       "full band"
@@ -616,6 +619,7 @@
     "registry": "htdemucs.yaml",
     "name": "HTDemucs",
     "arch": "HTDemucs",
+    "cpuOk": true,
     "target": "4-stem",
     "tags": [
       "balanced"
@@ -661,6 +665,7 @@
     "registry": "htdemucs_6s.yaml",
     "name": "HTDemucs 6-Source",
     "arch": "HTDemucs",
+    "cpuOk": true,
     "target": "multi",
     "tags": [
       "dual stems"
@@ -956,6 +961,7 @@
   "mbr_guitar_becruily": {
     "name": "Guitar (becruily)",
     "arch": "MelBand-RoFormer",
+    "cpuOk": true,
     "target": "instrumental",
     "tags": [
       "detailed split"

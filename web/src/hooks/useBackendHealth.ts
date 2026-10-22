@@ -13,6 +13,7 @@ import { useStore } from "@/lib/store";
 export function useBackendHealth() {
   const setBackendOnline = useStore((s) => s.setBackendOnline);
   const setDevice = useStore((s) => s.setDevice);
+  const setCpuCapability = useStore((s) => s.setCpuCapability);
 
   useEffect(() => {
     let cancelled = false;
@@ -26,6 +27,12 @@ export function useBackendHealth() {
         const data = (await res.json().catch(() => ({}))) as {
           error?: string;
           device?: string;
+          cpuModels?: string[];
+          cpuLimits?: {
+            maxSeconds: number;
+            maxBytes: number;
+            timeoutSeconds: number;
+          } | null;
         };
         // The proxy returns 200 with `error: "worker unreachable"` when the
         // worker is down, so a truthy `error` means offline.
@@ -35,6 +42,10 @@ export function useBackendHealth() {
         // CPU-only install looked identical to a GPU one.
         if (online && data.device) {
           setDevice(data.device.startsWith("cuda") ? "cuda" : "cpu");
+          // The worker publishes which models it will accept on a CPU, plus
+          // the CPU-mode ceilings. The picker needs both to avoid offering a
+          // model that the worker will refuse.
+          setCpuCapability(data.cpuModels ?? [], data.cpuLimits ?? null);
         }
       } catch {
         online = false;
@@ -52,5 +63,5 @@ export function useBackendHealth() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [setBackendOnline, setDevice]);
+  }, [setBackendOnline, setDevice, setCpuCapability]);
 }

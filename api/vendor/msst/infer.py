@@ -91,7 +91,14 @@ def demix(config, model, mix: NDArray, device, model_type: str = None, callback=
 		window_middle[-fade_size:] *= fadeout
 		window_middle[:fade_size] *= fadein
 
-	with torch.amp.autocast("cuda", enabled=config.training.get("use_amp", True)):
+	# Autocast has to follow the device. "cuda" autocast over CPU tensors is a
+	# no-op at best and a "CUDA is not available" warning at worst, and float16
+	# has no usable CPU kernels in a lot of torch's ops — the "fast" path
+	# turns into a slower one. So the device type is taken from the caller and
+	# AMP is forced off on CPU.
+	autocast_device = str(device).split(":")[0]
+	use_amp = bool(config.training.get("use_amp", True)) and autocast_device != "cpu"
+	with torch.amp.autocast(autocast_device, enabled=use_amp):
 		with torch.inference_mode():
 			# Determine the shape of the result based on model type and configuration
 			if model_type == "htdemucs":

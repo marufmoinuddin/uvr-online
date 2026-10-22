@@ -268,6 +268,11 @@ def execute_repair_job(
                 progress=lambda p, s: progress(
                     stage_progress(stage, total_stages, p * 0.8), s
                 ),
+                # A repair model runs as one light pass wrapped in DSP —
+                # CPU-usable by design. The separation-mode CPU speed cutoff
+                # does not apply to it (the submit path already exempts the
+                # repair scene; this keeps the backend guard in step).
+                allow_cpu_blocked=True,
             )
             chosen = resolve_repair_output(stems, plan["primaryStem"], plan["modelId"])
             current = local_path(chosen, work / "neural")

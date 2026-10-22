@@ -15,7 +15,9 @@
 #   3. backend compiles   — py_compile every api module
 #   4. repair pipeline    — DSP and the combined DSP+neural workflow
 #   5. stem naming + VRAM release
-#   6. typecheck + lint + build + browser smoke
+#   6. CPU mode           — device resolution, the CPU catalogue guard, and a
+#                            real separation on the CPU
+#   7. frontend           — typecheck + lint + build + browser smoke
 #
 # Exit: 0 = all green.
 
@@ -34,11 +36,11 @@ FAILED=0
 stage() { echo; echo "═══ $1 ═══"; }
 record() { if [ "$1" -ne 0 ]; then FAILED=1; echo "  ✗ $2"; else echo "  ✓ $2"; fi; }
 
-stage "1/6 catalog integrity"
+stage "1/7 catalog integrity"
 python3 "$ROOT/scripts/verify-catalog.py"
 record $? "api/models.json and web models.ts agree"
 
-stage "2/6 catalog verifier self-test"
+stage "2/7 catalog verifier self-test"
 if python3 "$ROOT/scripts/test-verify-catalog.py" >/dev/null 2>&1; then
   record 0 "verifier still catches all injected bug classes"
 else
@@ -58,7 +60,7 @@ rc=$?
 [ $rc -ne 0 ] && tail -12 /tmp/verify-lifecycle.log
 record $rc "gate owns only its own server and always releases it"
 
-stage "3/6 backend compiles"
+stage "3/7 backend compiles"
 if [ -x "$ROOT/api/.venv/bin/python" ]; then
   PY="$ROOT/api/.venv/bin/python"
 else
@@ -69,10 +71,11 @@ COMPILE_OUT=$("$PY" -m py_compile \
   "$ROOT/api/backend.py" \
   "$ROOT/api/job_queue.py" \
   "$ROOT/api/model_manager.py" \
+  "$ROOT/api/sep_worker.py" \
   "$ROOT/api/repair.py" 2>&1)
 record $? "api/*.py compile cleanly ${COMPILE_OUT:+— $COMPILE_OUT}"
 
-stage "4/6 repair pipeline (real ffmpeg + neural workflow)"
+stage "4/7 repair pipeline (real ffmpeg + neural workflow)"
 # DSP needs more than "exit 0": this checks every op is audible, full length,
 # and that a chain which silences the signal is rejected. The second script
 # covers the combined DSP + neural repair workflow.
@@ -91,13 +94,29 @@ else
   echo "  – skipped (no api/.venv)"
 fi
 
-stage "5/6 stem naming + VRAM release"
+stage "5/7 stem naming + VRAM release"
 "$ROOT/api/.venv/bin/python" "$ROOT/scripts/test-stems.py" >/tmp/verify-stems.log 2>&1
 rc=$?
 [ $rc -ne 0 ] && tail -12 /tmp/verify-stems.log
 record $rc "stem names canonical; both paths release VRAM"
 
-stage "6/6 frontend (typecheck + lint + build + browser smoke)"
+stage "6/7 CPU mode (device resolution, catalogue guard, real CPU separation)"
+# Runs the whole CPU path end to end on the CPU: the device setting, the
+# refusal of a model the catalogue does not mark CPU-capable, and a real
+# separation whose stems are checked for silence, NaN and duration drift.
+# UVR_DEVICE=cpu is set even though the test sets it itself, so the stage
+# cannot accidentally pass by running on a GPU.
+if [ -x "$ROOT/api/.venv/bin/python" ]; then
+  UVR_DEVICE=cpu "$ROOT/api/.venv/bin/python" "$ROOT/scripts/test-cpu-mode.py" --full \
+    >/tmp/verify-cpu.log 2>&1
+  rc=$?
+  [ $rc -ne 0 ] && tail -14 /tmp/verify-cpu.log
+  record $rc "CPU mode works, and blocked models are refused with a clear error"
+else
+  echo "  – skipped (no api/.venv)"
+fi
+
+stage "7/7 frontend (typecheck + lint + build + browser smoke)"
 WEB_ARGS=()
 [ "$QUICK" -eq 1 ] && WEB_ARGS+=("--quick")
 if [ "$QUICK" -eq 1 ]; then

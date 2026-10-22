@@ -183,6 +183,53 @@ def c_repair_without_primary_stem(t: Path) -> None:
     _edit_ui(t, '      primaryStem: "Other",\n', "")
 
 
+def _remove_cpu_ok_in_ui(t: Path, model_id: str) -> None:
+    """Remove the `cpuOk: true` line of ONE specific model in models.ts.
+
+    The line is located relative to the model's id, not by "the first one" —
+    the two catalogs are not in the same order, so a positional edit would
+    silently test a different model than the one named.
+    """
+    p = t / "web" / "src" / "lib" / "models.ts"
+    text = p.read_text()
+    i = text.index(f'id: "{model_id}",')
+    j = text.index("    cpuOk: true,\n", i)
+    text = text[:j] + text[j + len("    cpuOk: true,\n") :]
+    p.write_text(text)
+
+
+def c_cpu_ok_missing_in_ui(t: Path) -> None:
+    # The worker accepts this model on a CPU, but the picker would hide it —
+    # the user loses a working model with no explanation.
+    _remove_cpu_ok_in_ui(t, "htdemucs_6s")
+
+
+def c_cpu_ok_extra_in_worker(t: Path) -> None:
+    # The worker says a heavy RoFormer is CPU-capable but the picker does
+    # not: the two halves of the app disagree about what can run.
+    #
+    # The model must NOT already be CPU-capable in the worker catalogue, or
+    # this mutation would be a no-op and the verifier would (correctly) pass.
+    model = "mbr_crowd"
+    assert not json.loads((t / "api" / "models.json").read_text())[model].get("cpuOk")
+
+    def f(d):
+        d[model]["cpuOk"] = True
+    _edit_worker(t, f)
+
+
+def c_cpu_ok_unsupported(t: Path) -> None:
+    # A model that cannot run at all is also advertised as CPU-capable.
+    def f(d):
+        d["mel_band_roformer_fv9"]["cpuOk"] = True
+    _edit_worker(t, f)
+    _edit_ui(
+        t,
+        'id: "mel_band_roformer_fv9",',
+        'id: "mel_band_roformer_fv9",\n    cpuOk: true,',
+    )
+
+
 CASES = [
     ("model in worker catalog but not in UI", c_worker_only_id),
     ("unsupported flag missing from UI", c_unsupported_missing_in_ui),
@@ -199,6 +246,9 @@ CASES = [
     ("repair block removed from worker catalog", c_repair_dropped_from_ui),
     ("repair category differs between catalogs", c_repair_category_differs),
     ("repair capability with no primaryStem", c_repair_without_primary_stem),
+    ("CPU-capable flag dropped from UI", c_cpu_ok_missing_in_ui),
+    ("CPU-capable flag added in worker only", c_cpu_ok_extra_in_worker),
+    ("unsupported model marked CPU-capable", c_cpu_ok_unsupported),
 ]
 
 

@@ -53,6 +53,8 @@ const BASE_MODELS: Model[] = [
   },
   {
     id: "bs_polarformer_vocals",
+    unsupported:
+      "Its bs_siamese checkpoint uses LayerNorm gamma and y_attn weights that audio-separator's BS-RoFormer does not implement, so the state dict never loads.",
     name: "BS-PolarFormer Vocals",
     shortName: "PolarFormer Vocals",
     arch: "BS-PolarFormer",
@@ -101,6 +103,8 @@ const BASE_MODELS: Model[] = [
   },
   {
     id: "mel_band_roformer_fv8b",
+    unsupported:
+      "Fails to load with this backend - audio-separator's checkpoint loader exits before inference, on both GPU and CPU.",
     name: "Mel-Band RoFormer Fv8b",
     shortName: "FV8B",
     arch: "MelBand-RoFormer",
@@ -206,6 +210,7 @@ const BASE_MODELS: Model[] = [
     name: "2 HP UVR",
     shortName: "2 HP UVR",
     arch: "VR",
+    cpuOk: true,
     target: "dual",
     tags: ["full band"],
     sizeMB: 121,
@@ -358,6 +363,7 @@ const BASE_MODELS: Model[] = [
     name: "HTDemucs",
     shortName: "HTDemucs",
     arch: "HTDemucs",
+    cpuOk: true,
     target: "4-stem",
     tags: ["balanced"],
     sizeMB: 80,
@@ -385,6 +391,7 @@ const BASE_MODELS: Model[] = [
     name: "HTDemucs 6-Source",
     shortName: "HTDemucs 6S",
     arch: "HTDemucs",
+    cpuOk: true,
     target: "multi",
     tags: ["dual stems"],
     sizeMB: 52,
@@ -533,6 +540,7 @@ const BASE_MODELS: Model[] = [
     name: "Guitar (becruily)",
     shortName: "Guitar",
     arch: "MelBand-RoFormer",
+    cpuOk: true,
     target: "instrumental",
     tags: ["detailed split"],
     sizeMB: 41,

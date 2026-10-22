@@ -84,6 +84,8 @@ export function FileUploadCard({
   const addJob = useStore((s) => s.addJob);
   const backendOnline = useStore((s) => s.backendOnline);
   const catalog = useStore((s) => s.modelCatalog);
+  const device = useStore((s) => s.device);
+  const cpuModels = useStore((s) => s.cpuModels);
   const modelCount = React.useMemo(
     () => modelsForScene(scene, catalog, extractTarget ?? null).length,
     [scene, catalog, extractTarget],
@@ -92,6 +94,20 @@ export function FileUploadCard({
   // so they cannot be submitted as a plain single-model separation.
   const isEnsemble =
     catalog.find((m) => m.id === selectedModelId)?.ensemble ?? false;
+
+  // The picker disables CPU-blocked rows, but a selection persisted from a
+  // GPU session can still point at one — the worker would refuse the job only
+  // after the upload. Gate the submit button with the same rule the picker
+  // uses: the worker's own list wins when it has answered; the catalogue's
+  // cpuOk flag is the fallback before the first health response. Audio Repair
+  // is exempt: it is ffmpeg DSP (plus at most one light pass) and is meant to
+  // run on a CPU.
+  const cpuBlocked =
+    device === "cpu" &&
+    scene !== "audio-repair" &&
+    (cpuModels.length > 0
+      ? !cpuModels.includes(selectedModelId)
+      : catalog.find((m) => m.id === selectedModelId)?.cpuOk !== true);
 
   // Is the selected model already cached locally? If not, it is fetched on
   // demand the first time it is actually used (no manual file hunting).
@@ -489,7 +505,8 @@ export function FileUploadCard({
                 isEnsemble ||
                 offline ||
                 needsRepairWork ||
-                needsInstrument
+                needsInstrument ||
+                cpuBlocked
               }
               title={
                 offline
@@ -499,12 +516,18 @@ export function FileUploadCard({
                     : needsInstrument
                       ? "Choose an instrument to extract first."
                       : needsRepairWork
-                      ? "Choose a repair model or at least one fix-up first."
-                      : undefined
+                        ? "Choose a repair model or at least one fix-up first."
+                        : cpuBlocked
+                          ? "This model is not supported in CPU mode — it would take hours without a GPU. Pick one of the CPU-compatible models."
+                          : undefined
               }
               className={cn(
                 "flex h-11 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-indigo-500/50",
-                files.length > 0 && !submitting && !isEnsemble && !offline
+                files.length > 0 &&
+                  !submitting &&
+                  !isEnsemble &&
+                  !offline &&
+                  !cpuBlocked
                   ? "bg-white text-black hover:bg-white/90 shadow-[0_0_22px_-6px_rgba(255,255,255,0.4)]"
                   : "bg-white/[0.05] text-muted-foreground",
               )}

@@ -113,6 +113,79 @@ checkpoint would kill the uvicorn process and take the whole API down.
 ⚠️ Do **not** set `AUDIO_SEPARATOR_MODEL_DIR` — it globally overrides the
 `model_file_dir` passed to `Separator()` and clobbers the local model store.
 
+## Device selection
+
+`backend.resolve_device()` is the **single** source of truth for where
+inference runs. The worker, the health endpoint, the queue and the model guard
+all ask it, so they cannot disagree — a job labelled "GPU" that actually ran on
+the CPU is exactly the kind of lie this project exists to eliminate.
+
+| `UVR_DEVICE` | Behaviour |
+|---|---|
+| `auto` (default) | CUDA when a usable GPU is present, otherwise CPU |
+| `cuda` | CUDA or **fail loudly** — never a silent fallback |
+| `cpu` | CPU, even on a machine that has a GPU |
+
+`cuda` failing rather than falling back is deliberate: a silent fallback turns
+"I asked for the GPU" into a CPU job that runs for an hour, and the user only
+finds out from the elapsed time.
+
+### The CPU profile
+
+On the CPU, `backend.configure_runtime()` and the per-architecture parameter
+overrides turn off every fast-but-approximate path:
+
+- **autocast off.** `use_autocast=True` means float16/bf16 matmuls. On a GPU
+  that is a win; on a CPU many of those kernels are missing and fall back to
+  something *slower* than plain float32. This one setting was the difference
+  between "never finishes" and "finishes in seconds".
+- **TF32 off**, float32 matmul at `highest` precision.
+- **Thread budget.** `effective_cpu_threads()` takes the smallest of the CPU
+  affinity mask, the cgroup quota and the host core count — and only ever
+  *reduces* torch's own default. A container with a 2-CPU quota still reports
+  the host's 16 cores to `os.cpu_count()`, and 16 threads fighting over a
+  2-CPU quota is the classic CPU oversubscription slowdown.
+- **Cheaper inference.** `mdx_params` / `vr_params` / `demucs_params` /
+  `mdxc_params` get a lower overlap, batch size 1, and no shifts or TTA. The
+  vendored MSST path gets the same treatment through `CPU_PROFILE`
+  (`batch_size` 1, `num_overlap` 2).
+
+These are a **separate profile**, not inline conditionals, so tuning the GPU
+settings can never quietly change the CPU ones.
+
+⚠️ The parameter names above are the ones `audio-separator` actually reads
+(verified against 0.47). An unknown key is silently ignored — a typo would
+cost an order of magnitude in time and say nothing.
+
+### The CPU model subset
+
+Each catalog entry carries `cpuOk: true|false`, set from **measurement**
+(`scripts/benchmark-cpu.py`), not from the architecture name. In CPU mode the
+worker refuses the others before any weight is downloaded, with an error that
+names the model and says what to do instead. The flag exists in **both**
+catalogs and `scripts/verify-catalog.py` fails the build if they drift.
+
+The cutoff is a single number — **15 s per 5 s clip** on the reference
+machine — currently admitting 4 of 45 models. The measurement behind it is
+in `docs/results/cpu-benchmark-2026-10-22.md`.
+
+## Job execution
+
+Separation runs in a **child process** (`api/sep_worker.py`), not in a thread:
+
+- A Python thread cannot be killed. A cancelled or timed-out CPU job would
+  keep burning every core for the remaining (possibly hours-long) inference
+  while the queue reported it as cancelled, and every job behind it would
+  wait. Killing the process is the only way to actually stop the work.
+- A native crash — a CUDA OOM inside torch used to abort the whole worker
+  with an uncatchable SIGSEGV — now takes down the child, not the API.
+
+The parent polls a `multiprocessing.Queue` for `("progress", …)` /
+`("result", …)` / `("error", …)` messages, enforces a per-job wall-clock
+ceiling (`backend.job_timeout()`), and terminates the child on cancel or
+timeout. Audio Repair stays on a thread: it is ffmpeg DSP, which is fast and
+cancels cleanly.
+
 ## Ensemble engine
 
 `POST /ensemble` loads the stems of 2–6 ready jobs, aligns them, and fuses in

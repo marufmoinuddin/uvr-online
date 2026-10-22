@@ -119,6 +119,363 @@ resolve_registry_dir = _resolve_registry_dir
 
 ProgressFn = Callable[[float, str], None]
 
+
+# ---------------------------------------------------------------------------
+# Device selection
+#
+# ONE place decides where separation runs. The worker, the health endpoint,
+# the queue and the model guard all ask here, so they cannot disagree about
+# which device is in use — a worker that thinks it is on the CPU while the
+# queue labels the job "GPU" is exactly the kind of lie this project exists
+# to eliminate.
+#
+#   UVR_DEVICE=auto   CUDA when a usable GPU is present, otherwise CPU
+#   UVR_DEVICE=cuda   require CUDA; refuse to start if there is none
+#   UVR_DEVICE=cpu    never touch the GPU
+#
+# `cuda` deliberately FAILS on a machine without a GPU instead of falling back
+# silently: a silent fallback turns "I asked for the GPU" into a CPU job that
+# runs for an hour, and the user only finds out from the elapsed time.
+# ---------------------------------------------------------------------------
+
+DEVICE_ENV = "UVR_DEVICE"
+DEVICE_THREADS_ENV = "UVR_CPU_THREADS"
+
+# Set to "1" to let the measurement tool run the models the worker refuses in
+# CPU mode. See assert_runnable(). Never set in a deployment.
+ALLOW_BLOCKED_ENV = "UVR_ALLOW_BLOCKED_MODELS"
+
+# The CPU profile. A separate block of settings, not a set of inline
+# conditionals, so tuning the GPU path can never quietly change the CPU one
+# (and vice versa).
+#
+#   batch_size   chunks per forward pass. Batching only pays off when the
+#                maths is bandwidth-bound; on CPU it mostly adds memory
+#                pressure and lengthens every progress tick.
+#   num_overlap  overlap factor. The vendored demix walks the clip in steps of
+#                chunk_size / num_overlap, so 4 processes the audio 4x over.
+#                Halving it halves the work, at the cost of seam artefacts.
+CPU_PROFILE: dict[str, Any] = {
+    "batch_size": 1,
+    "num_overlap": 2,
+}
+
+
+# CPU-mode limits. A CPU run is orders of magnitude slower than a GPU run, so
+# an unbounded job is not merely slow — it blocks the single-threaded queue for
+# hours and every other user waits behind it. These bounds are enforced at
+# submit time (so the user is told immediately) and at run time (so a job
+# that slipped through still ends).
+CPU_MAX_SECONDS_ENV = "UVR_CPU_MAX_SECONDS"
+CPU_MAX_BYTES_ENV = "UVR_CPU_MAX_BYTES"
+CPU_JOB_TIMEOUT_ENV = "UVR_CPU_JOB_TIMEOUT"
+GPU_JOB_TIMEOUT_ENV = "UVR_GPU_JOB_TIMEOUT"
+
+DEFAULT_CPU_MAX_SECONDS = 120
+DEFAULT_CPU_MAX_BYTES = 64 * 1024 * 1024
+DEFAULT_CPU_JOB_TIMEOUT = 1800
+DEFAULT_GPU_JOB_TIMEOUT = 3600
+
+
+def _int_env(name: str, default: int) -> int:
+    """Read a positive integer from the environment, falling back to `default`."""
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        value = int(str(raw).strip())
+    except ValueError:
+        logger.warning("Ignoring invalid %s=%r (expected a positive integer)", name, raw)
+        return default
+    return value if value > 0 else default
+
+
+def cpu_max_seconds() -> int:
+    """Longest clip CPU mode accepts, in seconds."""
+    return _int_env(CPU_MAX_SECONDS_ENV, DEFAULT_CPU_MAX_SECONDS)
+
+
+def cpu_max_bytes() -> int:
+    """Largest upload CPU mode accepts, in bytes."""
+    return _int_env(CPU_MAX_BYTES_ENV, DEFAULT_CPU_MAX_BYTES)
+
+
+def job_timeout(device: str) -> int:
+    """Wall-clock ceiling for one job, in seconds.
+
+    The separation runs in a child process, so this is a real ceiling: the
+    process is killed when it is reached.
+    """
+    if device == "cpu":
+        return _int_env(CPU_JOB_TIMEOUT_ENV, DEFAULT_CPU_JOB_TIMEOUT)
+    return _int_env(GPU_JOB_TIMEOUT_ENV, DEFAULT_GPU_JOB_TIMEOUT)
+
+
+def cpu_limits() -> dict[str, Any]:
+    """The CPU-mode bounds, published by the health endpoint for the UI."""
+    return {
+        "maxSeconds": cpu_max_seconds(),
+        "maxBytes": cpu_max_bytes(),
+        "timeoutSeconds": _int_env(CPU_JOB_TIMEOUT_ENV, DEFAULT_CPU_JOB_TIMEOUT),
+    }
+
+
+def _cgroup_cpu_limit() -> Optional[int]:
+    """How many CPUs the cgroup actually grants, or None when unlimited.
+
+    A container with a CPU quota still reports the HOST's core count to
+    `os.cpu_count()`, so torch would start one thread per host core and every
+    one of them would fight over the same quota — the classic CPU
+    oversubscription that makes a "slow CPU" run absurdly slow.
+    """
+    # cgroup v2: "max 100000" when unlimited, "<quota> <period>" otherwise.
+    try:
+        raw = Path("/sys/fs/cgroup/cpu.max").read_text().split()
+        if raw and raw[0] != "max":
+            quota, period = int(raw[0]), int(raw[1])
+            if quota > 0 and period > 0:
+                return max(1, -(-quota // period))  # ceil division
+    except (OSError, ValueError, IndexError):
+        pass
+    # cgroup v1
+    try:
+        quota = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").read_text().strip())
+        period = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_period_us").read_text().strip())
+        if quota > 0 and period > 0:
+            return max(1, -(-quota // period))
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def effective_cpu_threads() -> int:
+    """Threads CPU inference may actually use.
+
+    The smallest of the CPU affinity mask, the cgroup quota and the host core
+    count — that is what this process can really get. `UVR_CPU_THREADS`
+    overrides it when a user knows better.
+    """
+    override = os.environ.get(DEVICE_THREADS_ENV)
+    if override:
+        try:
+            return max(1, int(override))
+        except ValueError:
+            logger.warning(
+                "Ignoring invalid %s=%r (expected a positive integer)",
+                DEVICE_THREADS_ENV,
+                override,
+            )
+    try:
+        affinity = len(os.sched_getaffinity(0))
+    except (AttributeError, OSError):  # pragma: no cover - non-Linux
+        affinity = os.cpu_count() or 1
+    limits = [n for n in (affinity, _cgroup_cpu_limit(), os.cpu_count()) if n]
+    return max(1, min(limits) if limits else 1)
+
+
+def resolve_device() -> str:
+    """The device inference will run on: "cuda" or "cpu".
+
+    Raises when the environment asks for something impossible (CUDA on a
+    machine without a GPU, or a misspelled value) rather than guessing.
+    """
+    pref = (os.environ.get(DEVICE_ENV) or "auto").strip().lower()
+    if pref not in ("auto", "cuda", "cpu"):
+        raise RuntimeError(
+            f"Invalid {DEVICE_ENV}={pref!r}. Use 'auto', 'cuda' or 'cpu'."
+        )
+    if pref == "cuda":
+        if not _using_cuda():
+            raise RuntimeError(
+                f"{DEVICE_ENV}=cuda was requested but no CUDA device is available. "
+                "Set UVR_DEVICE=auto to fall back to the CPU automatically."
+            )
+        return "cuda"
+    if pref == "cpu":
+        return "cpu"
+    return "cuda" if _using_cuda() else "cpu"
+
+
+def configure_runtime(device: Optional[str] = None) -> dict[str, Any]:
+    """Prepare torch for the chosen device and report what was applied.
+
+    On CPU this turns off every fast-but-approximate path: autocast (float16
+    matmuls), TF32 and reduced-precision matmul. CPU inference is already the
+    slow path, so it should at least be the *correct* one — and float16 on CPU
+    is not merely slower, many kernels are simply missing and fall back to
+    something worse.
+
+    Returns a small dict describing the resulting configuration, which the
+    health endpoint publishes so the UI can show the real numbers.
+    """
+    import torch
+
+    device = device or resolve_device()
+    info: dict[str, Any] = {"device": device}
+
+    if device == "cpu":
+        limit = effective_cpu_threads()
+        # Only ever REDUCE the thread count. Torch's own default is already a
+        # sensible choice; raising it above the cgroup quota is exactly the
+        # oversubscription this function exists to prevent.
+        if torch.get_num_threads() > limit:
+            torch.set_num_threads(limit)
+        info["threads"] = torch.get_num_threads()
+        info["threadsLimit"] = limit
+        torch.set_float32_matmul_precision("highest")
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cudnn.allow_tf32 = False
+        info["autocast"] = False
+        info["tf32"] = False
+    else:
+        info["threads"] = torch.get_num_threads()
+        info["threadsLimit"] = effective_cpu_threads()
+        info["autocast"] = True
+        info["tf32"] = True
+    return info
+
+
+def cpu_ok(model_id: str) -> bool:
+    """Can this model run on the CPU at all?
+
+    The catalogue decides (`cpuOk`); this only reads it. The answer comes from
+    measurement, not from the architecture name — a RoFormer is not
+    automatically too slow, and a Demucs is not automatically fast.
+    """
+    rec = manager.get(model_id)
+    if rec is None:
+        return False
+    return bool(getattr(rec, "cpu_ok", False))
+
+
+def assert_runnable(model_id: str, device: str, *, allow_cpu_blocked: bool = False) -> None:
+    """Refuse a model the chosen device cannot run, with a usable reason.
+
+    Called before any weight is downloaded, so the user gets an immediate
+    explanation instead of a long wait followed by a failure.
+
+    `allow_cpu_blocked` exempts the CPU-speed restriction (but not the
+    `unsupported` one): the Audio Repair pipeline runs a neural model as one
+    light pass wrapped in DSP, and is documented as CPU-usable. Its models are
+    deliberately NOT held to the separation-mode speed cutoff.
+    """
+    rec = manager.get(model_id)
+    if rec is None:
+        raise RuntimeError(f"Unknown model '{model_id}'.")
+    if rec.unsupported:
+        raise RuntimeError(f"'{rec.name}' cannot be used: {rec.unsupported}")
+    if device == "cpu" and not rec.cpu_ok and not allow_cpu_blocked:
+        # Escape hatch for the MEASUREMENT tool only. scripts/benchmark-cpu.py
+        # has to be able to time the very models the worker refuses — without
+        # that, the refusal has no evidence behind it. Never set this in a
+        # deployment.
+        if os.environ.get(ALLOW_BLOCKED_ENV) == "1":
+            logger.warning(
+                "Allowing CPU-blocked model %s (measurement mode)", model_id
+            )
+            return
+        raise RuntimeError(
+            f"'{rec.name}' is not supported in CPU mode. It is one of the heavy "
+            "models that would take hours on a CPU. Pick a lighter model "
+            "(the CPU-compatible ones are marked in the picker), or run the "
+            "worker with UVR_DEVICE=cuda on a machine with a GPU."
+        )
+
+
+def _cpu_separator_params() -> dict[str, Any]:
+    """Per-architecture parameter overrides for CPU mode.
+
+    audio-separator takes one dict per architecture family (`mdx_params`,
+    `vr_params`, `demucs_params`, `mdxc_params`). The names below are the ones
+    the library actually reads (verified against audio-separator 0.47) — an
+    unknown key is silently ignored, so a typo here would cost an order of
+    magnitude in time and say nothing.
+
+    * `overlap` / `num_overlap` — the chunk walk is `step = chunk / overlap`,
+      so a HIGHER overlap means MORE chunks and more work. Halving it halves
+      the compute, at the cost of seam artefacts.
+    * `shifts` and `enable_tta` — each multiplies the number of forward
+      passes. On an already-slow CPU they are the first things to go.
+    * `batch_size` — batching only pays off when the maths is bandwidth-bound;
+      on CPU it mostly adds memory pressure and lengthens every progress tick.
+
+    Any key left out falls back to the library's own default, so the dicts
+    below are complete on their own.
+    """
+    return {
+        "mdx_params": {
+            "hop_length": 1024,
+            "segment_size": 256,
+            "overlap": 0.1,
+            "batch_size": 1,
+            "enable_denoise": False,
+        },
+        "vr_params": {
+            "batch_size": 1,
+            "window_size": 512,
+            "aggression": 5,
+            "enable_tta": False,
+            "enable_post_process": False,
+            "post_process_threshold": 0.2,
+            "high_end_process": False,
+        },
+        "demucs_params": {
+            "segment_size": "Default",
+            "shifts": 0,
+            "overlap": 0.1,
+            "segments_enabled": True,
+        },
+        "mdxc_params": {
+            "segment_size": 256,
+            "override_model_segment_size": False,
+            "batch_size": 1,
+            "overlap": 2,
+            "pitch_shift": 0,
+        },
+    }
+
+
+def _supported_kwargs(sep_cls: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Drop kwargs the installed audio-separator does not accept.
+
+    The library's constructor signature has changed across releases (the
+    per-architecture `*_params` dicts are relatively recent). Passing an
+    unknown keyword is a hard TypeError, which would take down a CPU run that
+    is otherwise fine, so the constructor is inspected first.
+    """
+    import inspect
+
+    try:
+        params = inspect.signature(sep_cls.__init__).parameters
+    except (TypeError, ValueError):  # pragma: no cover - exotic callables
+        return kwargs
+    if any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
+        return kwargs
+    dropped = sorted(set(kwargs) - set(params))
+    if dropped:
+        logger.debug("audio-separator does not accept %s", ", ".join(dropped))
+    return {k: v for k, v in kwargs.items() if k in params}
+
+
+def _pin_device(sep: Any, device: str) -> None:
+    """Pin an audio-separator instance to `device`.
+
+    The library chooses CUDA whenever it is available, which is wrong when the
+    operator asked for CPU mode on a machine that happens to have a GPU — the
+    job would silently run on the card and the CPU thread budget would go
+    unused.
+    """
+    import torch
+
+    target = torch.device(device)
+    for attr in ("torch_device", "device"):
+        if not hasattr(sep, attr):
+            continue
+        try:
+            setattr(sep, attr, target)
+        except Exception:  # pragma: no cover - read-only attribute
+            logger.debug("Could not pin Separator.%s", attr, exc_info=True)
+
 # Small mtime-keyed caches so frequent /api/models polling stays cheap.
 _CATALOG_CACHE: dict[str, Any] = {}
 
@@ -356,6 +713,97 @@ def _using_cuda() -> bool:
         return False
 
 
+def _install_progress_hook(report: Callable[[float], None]) -> Optional[Callable[[], None]]:
+    """Make `audio-separator`'s chunk loops report real progress.
+
+    The library has no progress callback of its own — it drives `tqdm`
+    directly, and the only progress the worker could report was a fake 10%
+    jump at the start of inference. The bar then sat still for the whole run,
+    which on a CPU reads as a hung job, and the ETA derived from it was
+    meaningless.
+
+    Hooking `tqdm` is the only place the library exposes the chunk loop, so
+    that is where the progress comes from. Two shapes are patched:
+
+    * the architecture modules, which do `from tqdm import tqdm` and call the
+      class directly;
+    * the vendored Demucs helpers, which do `import tqdm` and call
+      `tqdm.tqdm(...)`.
+
+    The second one patches a shared module, so a **restore callable** is
+    returned and the patch is undone as soon as the run is over. Inference is
+    serial (one job at a time, in its own process), so there is nothing to
+    race with either way.
+
+    Returns the restore callable, or None if nothing could be hooked.
+    """
+    import importlib
+
+    try:
+        from tqdm import tqdm as real_tqdm
+    except ImportError:  # pragma: no cover - tqdm is an audio-separator dep
+        return None
+
+    class _ReportingTqdm(real_tqdm):  # type: ignore[misc, valid-type]
+        """tqdm that reports each chunk as it completes."""
+
+        def __init__(self, iterable=None, *args, **kwargs):
+            total = kwargs.get("total")
+            if total is None:
+                try:
+                    total = len(iterable)  # type: ignore[arg-type]
+                except TypeError:
+                    total = None
+            self._uvr_total = total
+            self._uvr_done = 0
+            super().__init__(iterable, *args, **kwargs)
+
+        def update(self, n=1):
+            self._uvr_done += n
+            if self._uvr_total:
+                try:
+                    report(min(1.0, self._uvr_done / self._uvr_total))
+                except Exception:  # pragma: no cover - never break inference
+                    pass
+            return super().update(n)
+
+    restores: list[Callable[[], None]] = []
+
+    for module in ("mdxc_separator", "vr_separator", "mdx_separator"):
+        try:
+            mod = importlib.import_module(
+                f"audio_separator.separator.architectures.{module}"
+            )
+        except Exception:  # pragma: no cover - layout change
+            continue
+        if getattr(mod, "tqdm", None) is real_tqdm:
+            mod.tqdm = _ReportingTqdm
+            restores.append(lambda m=mod: setattr(m, "tqdm", real_tqdm))
+
+    # The vendored Demucs helpers import the tqdm MODULE, so the class has to
+    # be replaced inside it. That is a shared object, hence the restore.
+    try:
+        import tqdm as tqdm_module
+
+        if getattr(tqdm_module, "tqdm", None) is real_tqdm:
+            tqdm_module.tqdm = _ReportingTqdm
+            restores.append(lambda: setattr(tqdm_module, "tqdm", real_tqdm))
+    except Exception:  # pragma: no cover
+        pass
+
+    if not restores:
+        return None
+
+    def restore() -> None:
+        for fn in restores:
+            try:
+                fn()
+            except Exception:  # pragma: no cover
+                pass
+
+    return restore
+
+
 def _separate_with_msst(
     model_id: str,
     config_path: str,
@@ -412,7 +860,18 @@ def _separate_with_msst(
     model = _Arch(**model_cfg)
     config = ConfigDict(raw_cfg)
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = resolve_device()
+    configure_runtime(device)
+
+    # CPU profile. Applied ONLY on CPU, so the GPU quality settings stay
+    # exactly as the model's config declares them.
+    if device == "cpu":
+        inference = getattr(config, "inference", None)
+        if inference is not None:
+            for key, value in CPU_PROFILE.items():
+                if getattr(inference, key, None) is not None:
+                    inference[key] = value
+
     state = torch.load(model_path, map_location=device, weights_only=False)
     for key in ("state", "state_dict"):
         if isinstance(state, dict) and key in state:
@@ -600,11 +1059,18 @@ class _AudioSeparatorBackend:
             )
 
         os.makedirs(output_dir, exist_ok=True)
+        device = resolve_device()
+        configure_runtime(device)
+        # Autocast means float16 matmuls: a clear win on a GPU, and on a CPU a
+        # liability — a lot of torch's ops have no usable float16 CPU kernel
+        # and fall back to something slower than plain float32.
         sep_kwargs: dict[str, Any] = {
             "output_dir": output_dir,
             "output_format": output_format.upper(),
-            "use_autocast": True,
+            "use_autocast": device == "cuda",
         }
+        if device == "cpu":
+            sep_kwargs.update(_cpu_separator_params())
 
         progress(5, "Loading model")
 
@@ -625,7 +1091,10 @@ class _AudioSeparatorBackend:
             rec = manager.get(model_id)
             model_type = _local_model_type(getattr(rec, "arch", None))
 
-            sep = self._cls(model_file_dir=str(ckpt.parent), **sep_kwargs)
+            sep = self._cls(
+                model_file_dir=str(ckpt.parent), **_supported_kwargs(self._cls, sep_kwargs)
+            )
+            _pin_device(sep, device)
             original = sep.download_model_files
             sep.download_model_files = lambda fn: (  # type: ignore[assignment]
                 ckpt.name,
@@ -654,17 +1123,31 @@ class _AudioSeparatorBackend:
             # model_file_dir globally and would clobber the local-store path.
             registry_dir = resolve_registry_dir()
             registry_name = getattr(rec, "registry", None) or model_id
-            sep = self._cls(model_file_dir=str(registry_dir), **sep_kwargs)
+            sep = self._cls(
+                model_file_dir=str(registry_dir),
+                **_supported_kwargs(self._cls, sep_kwargs),
+            )
+            _pin_device(sep, device)
             sep.load_model(model_filename=registry_name)
 
         # audio-separator exposes no per-chunk inference callback, so we cannot
         # report a percentage here the way the MSST path does. Say what is
         # actually true — which device is working, and that it is running —
         # instead of asserting "GPU" on a machine with no GPU.
-        sep_device = "GPU" if _using_cuda() else "CPU"
+        sep_device = "GPU" if device == "cuda" else "CPU"
         progress(10, f"Running inference on {sep_device}")
+
+        # Real per-chunk progress, from the library's own tqdm loop. Without
+        # it the bar sat at 10% for the whole run, which on a CPU reads as a
+        # hung job, and the ETA derived from a stalled bar is fiction.
+        restore_progress = _install_progress_hook(
+            lambda frac: progress(10 + frac * 80, f"Running inference on {sep_device}")
+        )
+
         start = time.time()
         produced = sep.separate(input_path)
+        if restore_progress is not None:
+            restore_progress()
         logger.info(
             "Separation took %.1fs for %s on %s",
             time.time() - start, model_id, sep_device.lower(),
@@ -692,7 +1175,10 @@ class _AudioSeparatorBackend:
                     "format": output_format,
                 }
             )
-            progress(10 + int((i + 1) / total * 85), f"Saved {stem}")
+            # The chunk loop already reported up to 90%, so the stems are
+            # written into the last tenth. Reporting from 10% again here made
+            # the bar jump backwards.
+            progress(90 + int((i + 1) / total * 10), f"Saved {stem}")
 
         # Release the checkpoint and return its VRAM. Without this the next job
         # starts with ~1.2 GB still held, needs more than the card has left, and
@@ -806,11 +1292,22 @@ def separate_file(
     extract_instrumental: bool = False,
     progress: Optional[ProgressFn] = None,
     extract_target: Optional[str] = None,
+    allow_cpu_blocked: bool = False,
 ) -> list[dict[str, Any]]:
     progress = progress or (lambda p, s: None)
     # Apply before any model is constructed. Idempotent, and harmless for
     # checkpoints that were trained with the default factor of 4.
     _patch_melband_mlp_expansion()
+    # Refuse a model this device cannot run BEFORE any weight is downloaded or
+    # loaded. The queue checks this too, but the backend is the last line of
+    # defence and must not depend on its callers having checked.
+    #
+    # `allow_cpu_blocked` is set by the Audio Repair workflow: its neural
+    # model runs as one light pass wrapped in DSP, which is CPU-usable by
+    # design and is not held to the separation-mode speed cutoff.
+    device = resolve_device()
+    configure_runtime(device)
+    assert_runnable(model_id, device, allow_cpu_blocked=allow_cpu_blocked)
     backend = get_backend()
     stems = backend.separate(
         model_id,

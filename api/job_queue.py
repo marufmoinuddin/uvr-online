@@ -19,9 +19,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
-import torch
+from queue import Empty
 
-from backend import separate_file
+from backend import job_timeout, resolve_device
 from repair_workflow import execute_repair_job
 from model_manager import manager as model_manager
 
@@ -44,6 +44,24 @@ UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
 
 # Statuses that can no longer progress once the process has restarted.
 _INTERRUPTED = ("queued", "processing")
+
+
+def _drain(channel: Any) -> list[tuple]:
+    """Take everything currently queued on `channel`, without blocking.
+
+    The child process reports progress and its final result through a
+    multiprocessing queue, so the parent polls it. Draining in a tight loop
+    (rather than one message at a time) keeps the queue from filling up while
+    the parent is busy.
+    """
+    out: list[tuple] = []
+    while True:
+        try:
+            out.append(channel.get_nowait())
+        except Empty:
+            return out
+        except (EOFError, OSError, ValueError):  # pragma: no cover
+            return out
 
 
 @dataclass
@@ -337,6 +355,126 @@ class JobQueue:
         for stale in (OUTPUT_ROOT / ".zips").glob(f"{job.id}-*.zip"):
             stale.unlink(missing_ok=True)
 
+    async def _run_separation(self, job: Job, device: str) -> list[dict[str, Any]]:
+        """Run the separation in a child process, with a real kill switch.
+
+        The child is a separate process, so a cancelled or timed-out job is
+        actually STOPPED. A thread could only be abandoned: it would keep
+        burning every core for the remaining (possibly hours-long) inference
+        while the queue reported the job as cancelled and every job behind it
+        waited. It also means a native crash inside torch takes down the child
+        instead of the whole worker.
+        """
+        import multiprocessing as mp
+
+        from sep_worker import run_separation
+
+        ctx = mp.get_context("spawn")
+        channel = ctx.Queue(maxsize=512)
+        request = {
+            "modelId": job.model_id,
+            "inputPath": job.input_path,
+            "outputDir": job.output_dir,
+            "outputFormat": job.options.get("outputFormat", "mp3"),
+            "useTTA": job.options.get("useTTA", False),
+            "extractInstrumental": job.options.get("extractInstrumental", False),
+            "extractTarget": job.options.get("extractTarget") or None,
+        }
+        proc = ctx.Process(target=run_separation, args=(request, channel), daemon=True)
+        proc.start()
+
+        timeout = job_timeout(device)
+        deadline = time.monotonic() + timeout
+        result: Optional[list[dict[str, Any]]] = None
+        error: Optional[str] = None
+
+        def handle() -> None:
+            """Consume everything the child has reported so far."""
+            nonlocal result, error
+            for msg in _drain(channel):
+                kind = msg[0]
+                if kind == "progress":
+                    self._on_progress(job, msg[1], msg[2])
+                elif kind == "result":
+                    result = msg[1]
+                elif kind == "error":
+                    error = msg[1]
+
+        try:
+            while True:
+                handle()
+                if result is not None or error is not None:
+                    break
+
+                if job.cancelled:
+                    self._stop_child(proc)
+                    raise RuntimeError("Cancelled.")
+
+                if time.monotonic() >= deadline:
+                    self._stop_child(proc)
+                    raise RuntimeError(
+                        f"The separation exceeded its {timeout}s limit on "
+                        f"{device} and was stopped. CPU separation is far "
+                        "slower than GPU separation — try a shorter clip, or "
+                        "one of the lighter CPU-compatible models."
+                    )
+
+                if not proc.is_alive():
+                    # The child may have put its final message just before it
+                    # exited, so give the queue a moment to deliver it before
+                    # declaring the job dead.
+                    for _ in range(30):
+                        await asyncio.sleep(0.1)
+                        handle()
+                        if result is not None or error is not None:
+                            break
+                        if proc.exitcode is not None and channel.empty():
+                            break
+                    if result is None and error is None:
+                        error = (
+                            "The separation process stopped unexpectedly "
+                            f"(exit code {proc.exitcode})."
+                        )
+                    break
+
+                await asyncio.sleep(0.15)
+        finally:
+            if proc.is_alive():
+                self._stop_child(proc)
+            # Reap the child. Without this it lingers as a zombie until the
+            # next process start, and a long queue would accumulate them.
+            try:
+                proc.join(timeout=5)
+            except Exception:  # pragma: no cover
+                pass
+            try:
+                channel.close()
+            except Exception:  # pragma: no cover
+                pass
+
+        if error is not None:
+            raise RuntimeError(error)
+        if not result:
+            raise RuntimeError(
+                "The separation produced no audio. The model may be "
+                "incompatible with this backend, or the input had no "
+                "decodable audio stream."
+            )
+        return result
+
+    @staticmethod
+    def _stop_child(proc: Any) -> None:
+        """Stop the child process, hard if it does not go quietly."""
+        try:
+            proc.terminate()
+            proc.join(timeout=5)
+            if proc.is_alive():
+                logger.warning("Separation process ignored SIGTERM — killing it")
+                proc.kill()
+                proc.join(timeout=5)
+        except Exception:  # pragma: no cover - the child may already be gone
+            logger.debug("Could not stop the separation process", exc_info=True)
+
     async def _process(self, job: Job) -> None:
         if job.cancelled:
             return
@@ -345,7 +483,12 @@ class JobQueue:
         # CUDA when there is one and on CPU otherwise. Labelling either as
         # "GPU inference" is simply false, and the stage is the only place the
         # user learns which device they are actually burning.
-        on_gpu = torch.cuda.is_available()
+        device = "cpu"
+        try:
+            device = resolve_device()
+        except RuntimeError as exc:  # pragma: no cover - misconfiguration
+            logger.error("Device could not be resolved: %s", exc)
+        on_gpu = device == "cuda"
         if job.kind == "repair":
             job.stage = "assemble"
         else:
@@ -354,7 +497,7 @@ class JobQueue:
         # >40min for a 5s clip). Start with no estimate and let _on_progress
         # derive one from the observed rate instead of inventing one.
         job.eta_sec = 5.0 if job.kind == "repair" else None
-        job.device = "cuda" if on_gpu else "cpu"
+        job.device = device
         job.started_at = time.time()
         await self._broadcast(job)
         try:
@@ -371,17 +514,7 @@ class JobQueue:
                     lambda p, s: self._on_progress(job, p, s),
                 )
             else:
-                stems = await asyncio.to_thread(
-                    separate_file,
-                    job.model_id,
-                    job.input_path,
-                    job.output_dir,
-                    job.options.get("outputFormat", "mp3"),
-                    job.options.get("useTTA", False),
-                    job.options.get("extractInstrumental", False),
-                    lambda p, s: self._on_progress(job, p, s),
-                    job.options.get("extractTarget") or None,
-                )
+                stems = await self._run_separation(job, device)
             if job.cancelled:
                 self._discard_output(job)
                 job.status = "cancelled"
@@ -443,13 +576,22 @@ class JobQueue:
         job.progress = pct
         if stage:
             # Keep the stage honest as phases change; never claim GPU on CPU.
-            job.stage = "gpu" if torch.cuda.is_available() else "cpu"
+            # The job's own device is the source of truth — re-querying CUDA
+            # here would label a CPU job "gpu" on a machine that merely HAS a
+            # GPU while running CPU mode.
+            job.stage = "cpu" if job.device == "cpu" else "gpu"
         # Derive the ETA from the rate actually observed, never from a
         # constant. Until enough progress has accumulated to be meaningful the
         # UI shows "estimating…" rather than a number that means nothing.
-        if pct >= 0.02:
-            rate = pct / max(job._elapsed(), 1e-6)  # fraction per second
-            job.eta_sec = round(max(0.0, (1.0 - pct) / rate), 1) if rate > 0 else None
+        #
+        # `pct` is 0-100, so it has to be scaled to a fraction before it is
+        # used as a rate — without that, (1.0 - pct) is negative for every
+        # progress value above 1% and the ETA collapses to 0.0 for the whole
+        # job, which reads as "finishing any moment" on a twenty-minute run.
+        if pct >= 2.0:
+            fraction = pct / 100.0
+            rate = fraction / max(job._elapsed(), 1e-6)  # fraction per second
+            job.eta_sec = round(max(0.0, (1.0 - fraction) / rate), 1) if rate > 0 else None
         loop = self._loop or asyncio.get_event_loop()
         loop.call_soon_threadsafe(
             lambda: asyncio.create_task(self._broadcast(job))

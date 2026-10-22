@@ -17,6 +17,9 @@ web/.env*.local
 # output
 output/
 output-local/
+output-benchmark/
+output-cpu-test/
+output-cpu-docker/
 api/output/
 
 # misc
